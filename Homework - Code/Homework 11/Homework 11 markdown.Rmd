@@ -1,0 +1,165 @@
+---
+title: "Homework 11"
+author: "Adam Forestier"
+date: "November 12, 2017"
+output: html_document
+---
+
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, message = FALSE)
+```
+
+
+
+\newpage 
+
+
+Clean current environment
+```{r}
+rm(list = ls())
+```
+
+Load piping and manipulation packages
+```{r}
+library(dplyr)
+library(magrittr)
+```
+
+
+# Read in CSV data
+```{r}
+telecom_df <- read.csv("Telco-Customer-Churn.csv", header = T)
+
+# Remove missing data
+# telecom_df <- na.omit(telecom_df)
+```
+
+
+# Transform "Churn" to numeric type
+
+Show current class of churn
+```{r}
+# See current type of Churn
+class(telecom_df$Churn)
+```
+
+Show levels of churn
+```{r}
+levels(telecom_df$Churn)
+```
+
+Transform churn to numeric
+```{r}
+# Create Churn column with 1 as yes and 0 as no
+telecom_df$Churn <- ifelse(telecom_df$Churn=="Yes", 1, 0)
+
+class(telecom_df$Churn)
+```
+
+
+# Show summary statistics of the dataset
+```{r}
+summary(telecom_df)
+```
+
+
+# Calculate the percentage of customers who churned
+```{r}
+# Take length of 1 divided by total number of observations multiply by 100 and round decimal to 1 
+round(length(which(telecom_df$Churn == 1))/length(telecom_df$Churn) * 100, 1)
+```
+
+
+# Multiple Linear Regression model to fit the data, regressing on churn
+
+Using stepAIC() method in MASS package to determine which independent variables to use
+
+```{r}
+# Load Package
+library(MASS)
+```
+
+Regress Churn on all other variables and use step method to determine which model to use
+```{r}
+# Regress mpg on all other variables
+fit <- lm(Churn ~ ., data = telecom_df)
+
+# Perform stepwise model selection
+step <- stepAIC(fit, direction = "both")
+
+# Show the results
+step$anova
+```
+
+According to the stepwise variable selection approach, the recommended model is SeniorCitizen + Dependents + Tenure + MultipleLines + InternetService + OnlineSecurity + OnlineBackup + TechSupport + StreamingTV + StreamingMovies + Contract + PaperlessBilling + PaymentMethod + TotalCharges
+
+
+Use model selected by stepwise selection as the final model
+```{r}
+# Regress churn on other variables
+# telecom_df <- na.omit(telecom_df)
+final_linear <- lm(Churn ~ SeniorCitizen + Dependents + Tenure + MultipleLines + InternetService + OnlineSecurity + OnlineBackup + TechSupport + StreamingTV + StreamingMovies + Contract + PaperlessBilling + PaymentMethod + TotalCharges,
+                data = telecom_df)
+
+
+
+# Show summary of final fit regression model
+summary(final_linear)
+```
+
+Detach MASS package to regain use of the select() method in dplyr package
+```{r}
+detach("package:MASS", unload = F)
+```
+
+# Logistic regression model to fit data, regressing on Churn
+```{r}
+# Regress churn on other variables
+final_logistic <- glm(Churn ~ SeniorCitizen + Dependents + Tenure + MultipleLines + InternetService + OnlineSecurity + OnlineBackup + TechSupport + StreamingTV + StreamingMovies + Contract + PaperlessBilling + PaymentMethod + TotalCharges, family=binomial(link='logit'),
+                data = telecom_df)
+
+# Show the summary of logistic regression results
+summary(final_logistic)
+```
+
+# Stargazer() function to show results of both linear and logistic regression analyses
+
+Load Package
+```{r}
+library(stargazer)
+```
+
+Show side-by-side comparison using stargazer
+```{r}
+stargazer(final_linear, final_logistic, type = "text", star.cutoffs = c(0.05, 0.01, 0.001),
+          title="Multiple Linear vs. Logistic Regression", digits=4)
+```
+
+Show why there are only 7,032 observations instead of 7,043
+```{r}
+sum(is.na(telecom_df))
+```
+
+There are 11 na values in the data frame
+
+# Calculate the McFadden R2 for the logistic regression model
+
+create null model
+```{r}
+# Fit null model
+null_model <- glm(Churn ~ 1,family=binomial(link='logit'),data=telecom_df)
+
+# Show likelihood of null model
+logLik(null_model)
+```
+
+Calculate McFadden R2
+```{r}
+cat("McFadden pseudo R2 = ", 1-logLik(final_logistic)/logLik(null_model))
+```
+
+
+
+
+

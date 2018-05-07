@@ -1,0 +1,443 @@
+---
+title: "Text Classification Models for Sentiment Analysis"
+author: "Langtao Chen"
+date: "Nov 29, 2017"
+output:
+  pdf_document:
+    toc: yes
+    toc_depth: 3
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+&nbsp;
+&nbsp;
+
+**Note**: In order to run this demo, the following R packages must be installed in your R environment:
+
+- tm: text mining
+- magrittr: forward pipe operator
+- SnowballC: Snowball stemmer
+- wordcloud: word clouds
+- RColorBrewer: ColorBrewer palettes
+- caret: predictive modeling
+
+
+\newpage
+
+```{r}
+# Clean the environment
+rm(list = ls())
+```
+
+# 1. Data Processing
+
+In this section, we create a data frame that contains documents as rows and sentiment terms as columns (features).
+
+## 1.1. Read Labeled Textual Dataset
+
+Read in the supervised textual dataset. The 500 text files that are labeled as having positive sentiment are under the folder "reviews/train/pos". The 500 text files that are labeled as having negative sentiment are under the folder "reviews/train/neg".
+
+```{r}
+library(tm)  # text mining and document management
+
+# Read positive dataset
+corpus_pos <- Corpus(DirSource("./reviews/train/pos", encoding = "UTF-8"),
+                     readerControl = list(language = "en_US"))
+
+# Read negative dataset
+corpus_neg <- Corpus(DirSource("./reviews/train/neg", encoding = "UTF-8"),
+                     readerControl = list(language = "en_US"))
+
+# Combine the positive and negative sets
+corpus <- c(corpus_pos, corpus_neg, recursive = TRUE)
+
+corpus <- Corpus(VectorSource(corpus))
+
+corpus
+
+```
+
+We notice that the combined corpus has two additional documents (1002 elements in total). We remove the two additional documents generated in the combination process.
+
+```{r}
+corpus <- corpus[-c(501,1002)]
+```
+
+```{r}
+# Remove unnecessary corpus objects
+rm(corpus_pos)
+rm(corpus_neg)
+```
+
+Let's store names of the files included in the corpus in a dataframe. We'll need the file names as they contain ratings of the movies.
+
+```{r}
+library(dplyr)
+
+file_summary <- corpus %>% 
+  summary() %>%
+  as.data.frame() %>%
+  filter(Var2=="Length") %>%
+  select(Var1) %>% rename(file_name = Var1)
+
+head(file_summary)
+```
+
+We can find that there is a prefix "content." for each file name. Let's remove the prefix.
+
+```{r}
+file_summary$file_name <- gsub("content.","",file_summary$file_name)
+
+head(file_summary)
+```
+
+
+First, let's show the content of the 1st document before textual data transformation. We'll check the content
+step by step to see the change of the content. Since each document contains many strings in the content, we
+wrap the content and only show the the begining part of the document.
+
+
+```{r}
+library(magrittr)
+
+# Show the content of the first document
+corpus[[1]]$content %>%
+strwrap() %>% head()
+```
+
+Now, let's preprocess the textual dataset.
+
+```{r}
+# strip whitspace from the documents in the collection
+corpus <- tm_map(corpus, stripWhitespace)
+
+# Show the content of the first document
+corpus[[1]]$content %>%
+strwrap() %>% head()
+```
+
+```{r}
+# convert uppercase to lowercase in the document collection
+corpus <- tm_map(corpus, tolower)
+
+# Show the content of the first document
+corpus[[1]]$content %>%
+strwrap() %>% head()
+```
+
+```{r}
+# remove numbers from the document collection
+corpus <- tm_map(corpus, removeNumbers)
+
+# Show the content of the first document
+corpus[[1]]$content %>%
+strwrap() %>% head()
+```
+
+```{r}
+# Convert encoding to UTF8
+corpus = tm_map(corpus,content_transformer(function(x) iconv(x, to='ASCII', sub='')))
+
+# Using a standard list, remove English stopwords from the document collection
+corpus <- tm_map(corpus, removeWords, stopwords("english"))
+
+# Show the content of the first document
+corpus[[1]]$content %>%
+strwrap() %>% head()
+```
+
+The following is the English stopwords that have been removed from the textual corpus.
+
+```{r}
+stopwords("english")
+```
+
+
+```{r}
+# remove punctuation from the document collection
+corpus <- tm_map(corpus, removePunctuation)
+
+# Show the content of the first document
+corpus[[1]]$content %>%
+strwrap() %>% head()
+```
+
+
+```{r}
+# Stemming
+corpus <- tm_map(corpus, stemDocument, language = "english")
+
+# Show the content of the first document
+corpus[[1]]$content %>%
+strwrap() %>% head()
+
+```
+
+## 1.2. Create Word Cloud
+
+We can use the wordcloud R package to create word cloud from a copus or a document.
+
+```{r}
+library(wordcloud)
+library(RColorBrewer)
+
+# Word cloud for the whole copus (40 documents)
+wordcloud(corpus, 
+          max.words = 150,
+          random.order = FALSE,
+          colors = brewer.pal(8, "Dark2"))
+
+```
+
+
+```{r}
+# Word cloud for the documents with positive sentiments
+wordcloud(corpus[1:500],
+          max.words = 90, 
+          random.order = FALSE,
+          colors = brewer.pal(6, "Dark2"))
+```
+
+```{r}
+# Word cloud for the documents with negative sentiments
+wordcloud(corpus[501:1000],
+          max.words = 90, 
+          random.order = FALSE,
+          colors = brewer.pal(6, "Dark2"))
+```
+
+
+## 1.3. Generate Dataset for Sentiment Classification
+
+We use the bag of words approach. First, let's create a terms-documents matrix to quantify the textual data. Then convert the document-term matrix as a data frame for text classification. The data fame has documents as rows, and term features as columns.
+
+```{r}
+# Create terms-documents matrix
+tdm <- TermDocumentMatrix(corpus)
+inspect(tdm)
+```
+
+
+
+
+```{r}
+# Find top terms that occur at least 50 times 
+top_words <- findFreqTerms(tdm, 50)
+
+top_words
+```
+
+```{r}
+# Create a TF-IDF matrix using the top words
+tfidf <- DocumentTermMatrix(corpus,
+                            control = list(dictionary = top_words,
+                                           weighting = weightTfIdf))
+inspect(tfidf)
+
+```
+
+Now we get `r length(colnames(tfidf))` terms in the term-document matrix. We use these term features to build a text classification model in the following section.
+
+
+Use the document-term matrix to create data frame for text classification.
+
+```{r}
+# Convert document-term matrix as data frame
+df <- tfidf %>% as.matrix() %>% as.data.frame()
+
+# Show the head of the first 10 columns
+head(df[,1:10])
+
+```
+
+
+
+## 1.4. Extract Rating from Document Name and Define Thumbs Up and Thumbs Down
+
+Rating is embedded in the document name. For example, the review file "101_8.txt" has a rating as 8.
+
+```{r}
+row.names(df) <- file_summary$file_name
+
+# Extract rating with regular expressions
+for(i in seq(along = row.names(df))){
+  first_split <- strsplit(row.names(df)[i], split = "[_]")
+  second_split <- strsplit(first_split[[1]][2], split = "[.]")
+  df$rating[i] <- as.numeric(second_split[[1]][1])
+  }
+
+# Define thumbs up (rating >5) and thumbs down (rating <=5)
+df$thumbsupdown <- ifelse((df$rating > 5), 1, 0)
+df$thumbsupdown <- factor(df$thumbsupdown,
+                          levels = c(0,1),
+                          labels = c("DOWN","UP"))
+
+# Remove the temporary rating column
+df$rating <- NULL
+
+```
+
+```{r}
+# Show the summary of the last 20 columns
+summary(df[,(length(df)-19):length(df)])
+```
+
+
+From the above summary, we know that the dataset is balanced (with 500 thumbsup and 500 thumbsdown).
+
+
+# 2. Sentiment Classification Models
+
+With the dataset that uses term frequency as features, we can apply regression analysis or machine learning methods to build sentiment classification models. 
+
+We can use the train() method in caret package to easily train a classification model. Refer to the following link for all available models supported by the train() method.
+
+http://topepo.github.io/caret/available-models.html
+
+We can call getModelInfo() method to get model information.
+
+
+## 2.1. Logistic Regression Model
+```{r}
+library(caret)
+## Train a logistic regression model using 10-fold cross-validation
+fitControl <- trainControl(method = "cv",number = 10)
+
+set.seed(123)
+logit_fit <- train(thumbsupdown ~ ., data = df,
+                   trControl = fitControl,
+                   method="glm", family=binomial(link='logit'),
+                   control = list(maxit = 50))
+
+print(logit_fit)
+
+confusionMatrix(logit_fit)
+```
+
+## 2.2. Train Support Vector Machine
+
+```{r}
+## Train Support Vector Machine (Radial Basis Function Kernel) using 10-fold Cross-Validation
+set.seed(123)
+svmRadial_fit <- train(thumbsupdown ~ ., data = df,
+                       trControl = fitControl, method = "svmRadial",
+                       verbose=FALSE)
+
+print(svmRadial_fit)
+
+confusionMatrix(svmRadial_fit)
+```
+
+```{r}
+# Plot resampling profile by accuracy
+plot(svmRadial_fit)
+```
+```{r}
+# Plot resampling profile by kappa statistic
+plot(svmRadial_fit, metric = "Kappa")
+```
+
+
+## 2.3. Train Gradient Boosted Machine (GBM)
+
+```{r}
+# Train GBM using 10-fold Cross-Validation
+set.seed(123)
+gbm_fit <- train(thumbsupdown ~ ., data = df,
+                 trControl = fitControl, method = "gbm",
+                 verbose=FALSE)
+
+print(gbm_fit)
+
+confusionMatrix(gbm_fit)
+```
+
+```{r}
+# Plot resampling profile by accuracry
+plot(gbm_fit)
+```
+
+```{r}
+# Plot resampling profile by kappa statistic
+plot(gbm_fit, metric = "Kappa")
+```
+
+
+## 2.4. Train k-NN
+
+```{r}
+# Train k-NN with 10-fold Cross-Validation
+set.seed(123)
+knn_fit <- train(thumbsupdown ~ ., data = df,
+                trControl = fitControl,
+                preProcess = c("center", "scale"),
+                method = "knn")
+
+print(knn_fit)
+
+confusionMatrix(knn_fit)
+```
+
+## 2.5. Train Naive Bayes
+
+```{r}
+# Train Naive Bayes with 10-fold Cross-Validation
+set.seed(123)
+nn_fit <- train(thumbsupdown ~ ., data = df,
+                trControl = fitControl,
+                preProcess = c("center", "scale"),
+                method = "naive_bayes")
+
+print(nn_fit)
+
+confusionMatrix(nn_fit)
+```
+
+## 2.6. Compare Different Predictive Models
+
+```{r}
+# Collect resamples
+resamps <- resamples(list(Logit=logit_fit, SVM=svmRadial_fit, GBM = gbm_fit, kNN = knn_fit, NaiveBayes = nn_fit))
+```
+
+```{r}
+# Summarize the resamples
+summary(resamps)
+```
+
+```{r}
+# Boxplots of resamples
+bwplot(resamps)
+```
+
+```{r}
+# Dot plots of resamples
+dotplot(resamps)
+```
+
+Comparing the four models, we found that GBM is the best since it has the highest levels of both accuracy and Kappa coefficient.
+
+We can compute the differences between models, then use a simple t-test to evaluate the null hypothesis that there is no difference between models.
+
+```{r}
+difValues <- diff(resamps)
+difValues
+```
+
+```{r}
+summary(difValues)
+```
+
+From the above hypothesis test, we can conclude that SVM and GBM have better performance than Logit and kNN in terms of prediction accuracy and inter-rater agreement (p-value < 0.05). The difference between SVM and GBM is not statistically significant (P = 1.0).
+
+We can also plot the difference between models.
+```{r}
+bwplot(difValues, layout = c(2, 1))
+```
+
+```{r}
+dotplot(difValues)
+```

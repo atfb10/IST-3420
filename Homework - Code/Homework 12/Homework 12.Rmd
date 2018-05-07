@@ -1,0 +1,113 @@
+---
+title: "Homework 12"
+author: "Adam Forestier"
+date: "November 19, 2017"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, message = F)
+```
+
+
+Clear Current Environment
+```{r}
+rm(list = ls())
+```
+
+
+Load Piping package
+```{r}
+library(magrittr)
+```
+
+# Read CSV File data 
+```{r}
+bike_df <- read.csv("DC_Bike_Rentals.csv", header = T)
+
+# Remove na values
+bike_df <- na.omit(bike_df)
+
+# Explore data
+head(bike_df)
+```
+
+
+# Show the structure of the data
+```{r}
+print(str(bike_df))
+```
+
+
+# Transform hour, season, holiday, workingday, & weather into factors
+```{r}
+# Choose variables to coerce to factors 
+factor_cols <- c("hour", "season", "holiday", "workingday", "weather")
+
+# Convert variables to factors
+bike_df[factor_cols] <- lapply(bike_df[factor_cols], factor)
+
+print(str(bike_df))
+```
+ 
+# Show summary statistics of the data set
+
+Load stargazer package to improve appearance of output
+```{r}
+library(stargazer)
+```
+ 
+Show summary statistics output 
+```{r}
+stargazer(bike_df, type = "text", title = "DC Bike Rentals")
+```
+ 
+# Create 10-fold validation configuration of control
+
+Load caret package 
+```{r}
+library(caret)
+```
+
+Cross-validation
+```{r}
+fit_control <- trainControl(method = "cv", number = 10) 
+```
+ 
+# Train multiple linear regression model to predict count
+```{r}
+# Train linear model
+set.seed(1234)
+multi_fit <- train(count ~ ., data = bike_df,
+                   trControl = fit_control,
+                   method="lm")
+
+# Show results
+print(multi_fit)
+```
+ 
+ 
+# Train GBM model that predicts count 
+```{r}
+# Train GBM model
+set.seed(1234)
+GBM_fit <- train(count ~ ., data = bike_df,
+                 trControl = fit_control,
+                 method = "gbm", verbose = F)
+
+print(GBM_fit)
+```
+ 
+# Compare the two different predictive models
+
+Resample and show results
+```{r}
+results <- resamples(list(linear = multi_fit, GBM = GBM_fit))
+
+summary(results)
+```
+ 
+ 
+ 
+ 
+ 

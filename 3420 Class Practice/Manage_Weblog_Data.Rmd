@@ -1,0 +1,199 @@
+---
+title: 'Manage Weblog Data'
+author: "Langtao Chen"
+date: "January 17, 2017"
+output: 
+  pdf_document: 
+    toc: yes
+    toc_depth: 3
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+&nbsp;
+&nbsp;
+
+
+\newpage
+
+# 1. Read in Dataset
+```{r}
+# Clean the environment
+rm(list = ls())
+
+#Read Apache Log File
+log <- read.table("sample_apache.log",
+                  sep = " ",
+                  stringsAsFactors = FALSE)
+
+```
+
+# 2. Undertand Raw Data
+
+```{r}
+# Show some records of the log file.
+head(log)
+```
+
+```{r}
+# Show the structure of the data frame
+str(log)
+
+```
+
+# 3. Cleanse and Transform Data
+
+First, let's load the dplyr package.
+```{r}
+# Load dplyr package
+library(dplyr)
+
+```
+
+Now, we can use the mutate() function in dplyr package to create a couple of new variables based on existing column in the raw dataset.
+```{r}
+# Create new variables
+log <- log %>% mutate(remote.host = V1,
+                      request.datetime = as.POSIXct(V4, format = "[%d/%b/%Y:%H:%M:%S"),
+                      request.date = as.Date(request.datetime),
+                      weekday = weekdays(request.datetime),
+                      request.method = gsub(" ","",substring(V6,1,4)),
+                      request.uri = gsub("/","",substring(V6,6,nchar(V6)-9)),
+                      status = V7,
+                      response.size = V8)
+
+```
+
+Convert the status column as a factor (a qualitative data column).
+```{r}
+log$status <- factor(log$status)
+```
+
+Show the head of the new data frame again to check the new variables.
+```{r}
+head(log)
+```
+
+From the above data sample, we can see those columns with names starting with "V" are not needed. We can use the select() function in dplyr package to keep only variables that do not start with "V". Note that we use the forward pipline operator "%>%".
+```{r}
+# Remove useless variables.
+log <- log %>% select(-starts_with("V"))
+```
+
+Show the head of the new data frame again to check the latest data frame.
+```{r}
+log %>% head
+```
+
+Now the data frame looks good. Let's check the structure of it.
+
+```{r}
+str(log)
+```
+
+# 4. Explore the Transformed Dataset
+```{r}
+# The number of website visits contained in the dataset
+nrow(log)
+```
+
+```{r}
+# The number of unique IP addresses
+log$remote.host %>% unique %>% length
+```
+
+```{r}
+# The earliest date
+min(log$request.date)
+```
+
+```{r}
+# The latest date
+max(log$request.date)
+```
+
+```{r}
+# Summary statistics of all variables.
+log %>% summary
+```
+
+Now, let's visualize the dataset to see some patterns more clearly.
+
+We use the ggplot2 package for data visualization.
+
+```{r}
+# Load ggplot2 package
+library(ggplot2)
+```
+
+```{r}
+# The frequency of request date
+ggplot(na.omit(log)) + geom_bar(aes(request.date)) + 
+  ggtitle("Request distribution by time")
+
+```
+
+To above barchart does not show all x labels. We can further customize the xlables for the ggplot.
+
+
+One ways is to simply change the paramter as a factor in the geom_bar().
+
+```{r}
+# The frequency of request date
+ggplot(na.omit(log)) + geom_bar(aes(factor(request.date))) + 
+  ggtitle("Request distribution by time")
+
+```
+
+We can use theme() method to change the angle of x labels.
+
+```{r}
+# The frequency of request date
+ggplot(na.omit(log)) + geom_bar(aes(factor(request.date))) + 
+  ggtitle("Request distribution by time") + 
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+
+```
+
+We can further customize the labels by using the scale_x_discrete() method.
+
+```{r}
+# The frequency of request date
+ggplot(na.omit(log)) + geom_bar(aes(x=factor(request.date))) + 
+  scale_x_discrete("Date", labels = paste0("Oct ", seq(15,22))) +
+  ggtitle("Request distribution by time")
+
+```
+
+```{r}
+# The frequency of web page
+ggplot(na.omit(log)) + geom_bar(aes(x=request.uri)) + ggtitle("Request distribution by page")
+```
+
+```{r}
+# The frequency of status
+ggplot(na.omit(log)) + geom_bar(aes(x=status)) + ggtitle("Request distribution by status")
+
+```
+```{r}
+# Web traffic by date
+daily_download <- log %>% group_by(request.date) %>% 
+  summarize(sum(as.numeric(response.size)))
+```
+```{r}
+names(daily_download) <- c("request.date", "request.size")
+# Convert to megabytes
+daily_download$request.size <- daily_download$request.size/1024/1024
+# Response size by date
+plot(daily_download, type = "b")
+```
+
+
+Now, we can save the transformed data frame into file for futher data analysis.
+```{r}
+write.csv(log, file = "sample_apache_clean.csv", row.names = FALSE)
+```
+
+

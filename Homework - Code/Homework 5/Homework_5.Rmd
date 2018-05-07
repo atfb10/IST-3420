@@ -1,0 +1,64 @@
+---
+title: "Homework 5"
+author: "Adam Forestier"
+date: "September 27, 2017"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+Clear the current environement
+```{r}
+rm(list = ls())
+```
+
+# 1 Download the CSV file
+
+# Read the CSV into R
+```{r}
+# set working directory
+setwd("D:/College Work/Junior Year/IST 3420/Homework - Code/Homework 5")
+
+# Read in CSV File
+retailer_info <- read.csv("top100retailers2015.csv", header = TRUE)
+```
+
+# 3 Show summary statistics of the dataset
+```{r}
+summary(retailer_info)
+```
+
+# 4 Convert factor data into numeric data for all columns except "Company" and "Headquarter".
+```{r}
+retailer_info$X <- as.numeric(retailer_info$X)
+retailer_info$Rank <- as.numeric(retailer_info$Rank)
+retailer_info$RetailSales2014 <- as.numeric(gsub('[$,]', '', retailer_info$RetailSales2014))
+retailer_info$USASalesGrowth <- as.numeric(gsub('[%]', '', retailer_info$USASalesGrowth))
+retailer_info$WorldwideRetailSales <- as.numeric(gsub('[$,]', '', retailer_info$WorldwideRetailSales))
+retailer_info$USAPercentageOfWorldwideSales <- as.numeric(gsub('[%]', '', retailer_info$USAPercentageOfWorldwideSales))
+retailer_info$Stores2014 <- as.numeric(gsub('[,]', '', retailer_info$Stores2014))
+retailer_info$Growth <- as.numeric(gsub('[%]', '', retailer_info$Growth))
+
+```
+
+
+# 5 Create a column named "City" and use it to store the city extracted from "Headquarter"
+```{r}
+city <- gsub(",.*$", "", retailer_info$Headquarter)
+retailer_info <- cbind(retailer_info, city)
+```
+
+# 6 Create a column named "State" and use it to store the state extracted from "Headquarter"
+```{r}
+state <- gsub("^.*, ", "", retailer_info$Headquarter)
+retailer_info <- cbind(retailer_info, state)
+```
+
+# 7 Show summary statistics of the new dataset
+```{r}
+summary(retailer_info)
+```
+

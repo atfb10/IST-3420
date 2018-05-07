@@ -1,0 +1,105 @@
+---
+title: "Scraping Posts from Online Forum"
+author: "Adam Forestier"
+date: "September 20, 2017"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+```{r}
+rm(list = ls())
+```
+
+
+
+# Step 1. Prepare URLs
+
+```{r}
+url <- "http://www.topix.com/forum/city/rolla-mo/"
+
+num_pages <- 127 
+
+for(i in 2:num_pages) {
+  url <- rbind(url, 
+               paste0("http://www.topix.com/forum/city/rolla-mo/p", i))
+}
+```
+Explore the url vector
+
+```{r}
+class(url)
+```
+
+Convert url as a vector of strings
+```{r}
+url <- c(url)
+class(url)
+```
+
+```{r}
+head(url)
+```
+
+
+# Step2. Get HTTP responses of all pages
+
+Load libraries
+```{r}
+library("XML")
+library("RCurl")
+```
+
+```{r}
+http_res <- getURL(url)
+```
+
+Show the first 800 characters of the first HTTP response.
+```{r}
+substr(http_res[1],1,800)
+```
+
+# Step 3. Navigate through HTTP Response (using XPath)
+
+We can use for loop structure to navigate through all HTTP response documents
+```{r}
+thread_df <- NULL # Initialize the data frame object
+
+for (i in 1:2) {
+  # Pass HTTP Response
+  doc <- htmlParse(http_res[i])
+
+  # Use XPath to get key information
+  title <- trimws(xpathSApply(doc, "//a[@class='threadtitle']", xmlValue))
+  
+  last_update_date <- trimws(xpathSApply(doc, "//td[@class='lut']", xmlValue))
+  
+  last_update_by <- trimws(xpathSApply(doc, "//td[@class='lub']",xmlValue))
+  
+  num_of_comments <- trimws(xpathSApply(doc, "//td[@class='numposts']",xmlValue))
+  
+  thread_df <- rbind(thread_df,
+        data.frame(title, last_update_date, last_update_by, num_of_comments))
+  
+  head(thread_df)
+}
+
+```
+
+# step 4. Show the structure of the data frame
+
+```{r}
+str(thread_df)
+```
+
+
+# Step 5. Save the dataset 
+
+```{r}
+write.csv(thread_df, "topix_rolla_threads20170920.csv")
+```
+
+

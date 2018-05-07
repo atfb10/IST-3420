@@ -1,0 +1,82 @@
+---
+title: "Homework 6"
+author: "Adam Forestier"
+date: "October 8, 2017"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+Clean the current environment 
+```{r}
+rm(list = ls())
+```
+
+# Read in dataset
+
+```{r}
+apache_log <- read.table("sample_apache.log", sep = "", stringsAsFactors = F)
+```
+
+# Show the raw data
+
+Show the structure of data
+```{r}
+str(apache_log)
+```
+
+Show first 10 values
+```{r}
+head(apache_log, n = 10)
+```
+
+# Transform and cleanse the data
+
+Load in dplyr package
+```{r}
+library(dplyr)
+```
+
+Create the new variables
+```{r}
+apache_log <- apache_log %>% mutate(remote.host = V1,
+                                    status = V7,
+                                    request.datetime = as.POSIXct(V4, format = "[%d/%b/%Y:%H:%M:%S"),
+                                    request.date = as.Date(request.datetime),
+                                    weekday = weekdays(request.datetime),
+                                    request.method = gsub(" ","",substring(V6,1,4)),
+                                    request.uri = gsub("/","",substring(V6,6,nchar(V6)-9)))
+                                    
+```
+
+Remove the unnecessary variables
+```{r}
+# Selects only the six variables needed
+apache_log <- apache_log %>% select(remote.host, status, request.datetime, weekday,request.method, request.uri)
+```
+
+# Show visitors per ip address
+
+Create data frame which shows the total number of visits for each unique IP address
+```{r}
+visit_per_IP <- count(apache_log, remote.host)
+colnames(visit_per_IP) <- c("remote.host", "count_of_visit")
+```
+
+Show total count of each number of visits per unique IP 
+```{r}
+table(visit_per_IP$count_of_visit)
+```
+
+
+Subset the "visit_per_IP" to create a data frame called "visit_per_IP2" which only contains information for unique IP addresses that have 2 or more visits. 
+```{r}
+visit_per_IP2 <- visit_per_IP[which(visit_per_IP$count_of_visit >= 2),]
+```
+
+
+
+
+

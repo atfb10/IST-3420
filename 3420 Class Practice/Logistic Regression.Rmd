@@ -1,0 +1,158 @@
+---
+title: "Logistic Regression"
+author: "Langtao Chen"
+date: "Oct 28, 2017"
+output: 
+  pdf_document: 
+    toc: yes
+    toc_depth: 3
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+&nbsp;
+&nbsp;
+
+
+\newpage
+
+
+```{r}
+# Clean the environment
+rm(list = ls())
+```
+
+
+# 1. Read in Data
+
+In this example, we'll use the titanic dataset to demonstrate how to conduct logistic regression analysis.
+
+```{r}
+# Read data
+df <- read.csv("titanic.csv", na.strings=c(""),
+               stringsAsFactors = FALSE)
+str(df)
+```
+
+The titanic dataset contains 1309 passengers.
+
+- pclass: ticket class (1 = 1st, 2 = 2nd, 3 = 3rd)
+
+- sibsp: the number of siblings and/or spouses aboard
+
+- parsc: the number of parents and/or children aboard
+
+- fare: passenger fare
+
+```{r}
+head(df)
+```
+
+```{r}
+# Remove the index column
+df$Index <- NULL
+str(df)
+```
+
+# 2. Explore Data
+
+```{r}
+# Frequency of survival
+table(df$survived)
+```
+
+Among the 1309 passengers, 500 survived.
+
+```{r}
+# Summary statistics
+summary(df)
+```
+
+We notice that there are some missing values. Here we simply remove missing values.
+
+```{r}
+# Remove missing data
+df <- na.omit(df)
+summary(df)
+```
+
+
+# 3. Logistic Regression
+
+With the visualization of linear relationship between shoe size and height, now let's formally use linear regression model to analyze this linear relationship.
+
+```{r}
+# Regress survived on all other variables
+model <- glm(survived ~ factor(pclass) + factor(sex) + age + sibsp + parch + fare,
+             family=binomial(link='logit'),data=df)
+
+summary(model)
+```
+
+Let's use the stargazer package to report regression results in a more professional way.
+
+```{r}
+# install.packages("stargazer") #Install stargazer package, do this only once
+library(stargazer)
+```
+
+
+```{r}
+stargazer(model, type = "text",star.cutoffs = c(0.05, 0.01, 0.001),
+          title="Logistic Regression", digits=4)
+```
+
+Interpretation of the logistic regression is:
+
+- Parch and fare are not statistically significant;
+
+- Positive coefficients indicate positive effects on probability of survival;
+
+- Negative coefficients indicate negative effects on probability of survival:
+
+    a. Being male reduces the log odds by 2.55 after controlling for other factors;
+  
+    b. A unit increase in age reduces the log odds by 0.039 after controlling for other factors;
+  
+    c. Having one more sibling and/or spouse aboard reduced the log odds by 0.359 after controlling for other factors.
+
+
+
+We notice that logistic regression does not report R squared. We can calculate the McFadden seudo R squared.
+
+```{r}
+# McFadden R2
+install.packages("pscl")
+library(pscl)
+pR2(model)
+```
+
+# 4. Use Logistic Regression Model to Predict New Data
+
+Let's use the trained logistic regression model to predict the survival probability for Jack and Rose. The test data are created based on the plot of the movie: https://en.wikipedia.org/wiki/Titanic_(1997_film)
+
+```{r}
+test <- data.frame(sex = c("male", "female"),
+                   pclass = c("3","1"),
+                   age = c(19,17),
+                   sibsp = c(0,0),
+                   parch = c(0,1),
+                   fare = c(5,500))
+test$sex <- factor(test$sex)
+test$pclass <- factor(test$pclass,levels=c("1","2","3"))
+
+print(test)
+```
+
+Let's call the predict() function to do the prediction.
+
+```{r}
+test$pred <- predict(model,test, type="response")
+
+print(test)
+```
+
+Jack's probability of survival was 0.15 whereas Rose's probability was 0.98. This makes sense as Rose is in the 1st class, female, and younger than Jack.
+

@@ -1,0 +1,125 @@
+---
+title: "Homework 13"
+author: "Adam Forestier"
+date: "December 10, 2017"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, message = F)
+```
+
+# Clear the environment
+```{r}
+rm(list=ls())
+```
+
+# 2. Read in df
+```{r}
+library(tm)
+df <- read.delim("SMSSpamCollection.txt", sep="\t", header = FALSE, col.names = c("Class", "Text"), encoding = "utf-8", quote = "")
+df$ID <- 1:nrow(df)
+```
+
+# 3. Create a corpus
+```{r}
+corpus <- Corpus(VectorSource(df$Text))
+```
+
+# 4. Text preprocessing
+```{r}
+corpus <- tm_map(corpus, stripWhitespace)
+corpus <- tm_map(corpus, tolower)
+corpus <- tm_map(corpus, removeNumbers)
+corpus <- tm_map(corpus, removePunctuation)
+corpus <- tm_map(corpus, removeNumbers)
+corpus <- tm_map(corpus, removeWords, stopwords("english"))
+corpus <- tm_map(corpus, stemDocument, language = "english")
+```
+
+# 5. Wordcloud
+```{r}
+# Load packages
+library(wordcloud)
+library(RColorBrewer)
+
+# Create wordcloud
+wordcloud(corpus, max.words = 75, random.order = FALSE, colors = brewer.pal(8, "Set1"))
+```
+
+# 6. Create a term-document matrix
+```{r warning=FALSE}
+library(magrittr)
+
+# Create term document matrix
+tdm <- TermDocumentMatrix(corpus)
+
+# Create list with words that appear 50 times
+topWords <- findFreqTerms(tdm, 50)
+# Create document term matrix
+dtm <- DocumentTermMatrix(corpus, control = list(dictionary = topWords, weighting = weightTfIdf))
+
+# Convert to a dataframe
+matrixdf <- dtm %>% as.matrix %>% as.data.frame()
+
+# Add column to predict back to dataframe
+matrixdf$hamspam <- df$Class
+```
+
+# 7. Classification
+
+## Data partitioning
+```{r}
+library(caret)
+
+set.seed(123)
+trainIndex <- createDataPartition(matrixdf$hamspam, p = .3, list = FALSE)
+
+trainData <- matrixdf[ trainIndex,]
+testData <- matrixdf[-trainIndex,]
+
+fitControl <- trainControl(method = "cv", number = 10, classProbs = TRUE, summaryFunction = twoClassSummary)
+```
+
+## Regression Models
+
+
+### Logistic Regression
+```{r, warning=FALSE}
+logisticFit <- train(hamspam ~ .,
+                     data = trainData,
+                     trControl = fitControl,
+                     method = "glm",
+                     family = binomial(link = 'logit'),
+                     metric = "ROC")
+
+print(logisticFit)
+```
+
+Show confusion matrix
+```{r}
+confusionMatrix(logisticFit)
+```
+
+### Naive Bayes classification
+```{r}
+naiveBayesFit <- train(hamspam ~ .,
+                       data = trainData,
+                       trControl = fitControl,
+                       preProcess = c("center", "scale"),
+                       method = "naive_bayes",
+                       metric = "ROC")
+
+print(naiveBayesFit)
+```
+
+Show confusion matrix 
+```{r}
+confusionMatrix(naiveBayesFit)
+```
+
+
+
+
+
+

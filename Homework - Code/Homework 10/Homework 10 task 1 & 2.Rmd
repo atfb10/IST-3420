@@ -1,0 +1,116 @@
+---
+title: "Homework 10"
+author: "Adam Forestier"
+date: "November 5, 2017"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, Message = F)
+```
+
+
+\newpage
+
+
+# Task 1
+
+Clean Current environment
+```{r}
+rm(list = ls())
+```
+Load dplyr and magrittr packages
+```{r}
+library(magrittr)
+library(dplyr)
+```
+
+# 1 Use mtcars dataset and focus on miles per gallon and transmission
+```{r}
+task1_df <- mtcars %>% select(mpg, am)
+print(head(task1_df))
+```
+
+# 2. Side by side boxplot showing the difference of mpg by transmission type
+```{r}
+# Create side by side boxplot using base R
+two_box <- boxplot(mpg ~ am, data = task1_df, col = c("blue", "red"),
+                   main = "MPG by Transmission Type",
+                   xlab = "Transmission",
+                   ylab = "MPG")
+
+# Print Boxplot
+print(two_box)
+```
+
+# 3 Use unpaired two sample t-test to compare the two different transmission types
+```{r}
+transmission1 <- task1_df$mpg[task1_df$am == 0]
+transmission2 <- task1_df$mpg[task1_df$am == 1]
+
+t.test(transmission1, transmission2, alternative = "two.sided", mu = 0, paired = F)
+```
+
+
+\newpage 
+
+# Task 2
+
+
+# 1 Use mtcars dataset and focus on miles per gallon and weight
+```{r}
+task2_df <- mtcars %>% dplyr::select(mpg, wt)
+print(head(task2_df))
+```
+
+
+# 2 Regress mpg on wt using mpg as dependent variable, wt as independent variable. 
+
+Visualize the data
+```{r}
+regression_plot <- plot(x = task2_df$wt, y = task2_df$mpg, col = "red", main = "MPG relationship with Weight",
+     ylab = "MPG", xlab = "Weight")
+regression_plot <- abline(lm(task2_df$mpg ~ task2_df$wt), col = "black")
+print(regression_plot)
+```
+
+
+Regression results
+```{r}
+first_linear <- lm(mpg ~ wt, data = task2_df)
+
+summary(first_linear)
+```
+
+# 3 Stargazer() function to beautify regression output
+
+Load stargzer library
+```{r}
+library(stargazer)
+```
+
+Improve regression output appearance with stargazer
+```{r}
+stargazer(first_linear, type = "text", star.cutoffs = c(0.05, 0.01, 0.001), title = "MPG and weight simple linear regression", digits = 4)
+```
+
+# 4 Find regression model
+
+```{r}
+# Regression model = 37.2851 - 5.3445(wt/1000)
+
+# Predicted mpg of car weighing 5500 pounds
+cat("Car mpg = ", 37.2851 - 5.3445*(5500/1000))
+```
+
+
+
+
+
+
+
+
+
+
+
+

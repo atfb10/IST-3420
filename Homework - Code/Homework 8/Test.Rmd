@@ -1,0 +1,110 @@
+---
+title: "Homework 8"
+author: "Adam Forestier"
+date: "October 22, 2017"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, message = F)
+```
+
+Clean Environment
+```{r}
+rm(list = ls())
+```
+
+Load Packages
+```{r}
+require(dplyr)
+require(magrittr)
+require(ggplot2)
+require(tidyr)
+require(maps)
+```
+
+# Read MST Enrollment data 
+```{r}
+mst <- read.csv("mst_enrollment2015.csv")
+
+# Show structure
+str(mst)
+```
+
+# Remove not US Data
+```{r}
+mst_us <- mst %>% dplyr::filter(mst$Country == "United States")
+```
+
+# Remove Missouri Data
+```{r}
+mst_us <- mst_us %>% dplyr::filter(mst_us$State != "Missouri")
+```
+
+Load State Map Data
+```{r}
+# Create a data frame of map data for all states
+us_states <- map_data("state")
+
+# List all states in map dataset
+map_state <- unique(us_states$region)
+map_state
+```
+
+We see that Armed Forces Europe, Armed Forces Pacific, Hawaii, and Alaska aren't in the map package so we need to remove them 
+```{r}
+mst_us <- mst_us %>% dplyr::filter(mst_us$State != "Armed Forces Europe")
+mst_us <- mst_us %>% dplyr::filter(mst_us$State != "Armed Forces Pacific")
+mst_us <- mst_us %>% dplyr::filter(mst_us$State != "Alaska")
+mst_us <- mst_us %>% dplyr::filter(mst_us$State != "Hawaii")
+```
+
+
+# Reshape the dataset by transforming it from wide format to long format
+```{r}
+mst_us_long <- mst_us %>% gather(Year, Enroll, X2011, X2012, X2013, X2014, X2015)
+```
+
+lower capitilization on State names
+```{r}
+mst_us_long$State <- tolower(mst_us_long$State)
+```
+
+# Aggregate enrollment data into state level, i.e. calculate total enrollment for each state using dplyr
+```{r}
+# Aggregate data
+by_state <- group_by(mst_us_long, State)
+enrollment_count <- summarise(by_state, pop = sum(Enroll))
+
+# Show top 6 enrollment states 
+head(enrollment_count[order(enrollment_count$pop, decreasing = T),])
+```
+
+# MST out-of-state enrollment plot on the US states map
+
+Merge Data Sets
+```{r}
+# Rename Columns of us_states for merging purposes
+colnames(us_states) <- c("long", "lat", "group", "order", "State", "subregion")
+
+# Merge Enrollment_Count and us_states for map
+pop_map <- merge(us_states, enrollment_count, by="State")
+```
+
+
+Create Map Visualization
+```{r}
+ggplot() + 
+  geom_polygon(data = pop_map,
+               aes(x=long, y=lat, group = group, fill=pop_map$pop),
+               colour="black") + 
+  scale_fill_continuous(low = "darkslategray1", high = "darkblue", guide="colorbar") + 
+  theme_bw() +
+  labs(fill = "Enrollment",
+       title = "Missouri S&T Enrollment by State",
+       x="", y="") +
+  scale_y_continuous(breaks=c()) +
+  scale_x_continuous(breaks=c()) + 
+  theme(panel.border =  element_blank())
+
+```

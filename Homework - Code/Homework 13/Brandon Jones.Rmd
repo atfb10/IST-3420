@@ -1,0 +1,259 @@
+---
+title: "Brandon Jones Homework 13"
+author: "Brandon Jones"
+date: "December 6, 2017"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+Clear Environment
+```{r}
+rm(list = ls())
+```
+
+#2 Read in Data
+
+```{r}
+doc <- read.table(file = "SMSSpamCollection.txt", 
+                  header = FALSE, 
+                  sep = "\t",
+                  quote = "",
+                  fill = TRUE,
+                  col.names = c("Type","Text"),
+                  stringsAsFactors=FALSE
+                  )
+
+doc$ID <- seq.int(nrow(doc))
+
+head(doc)
+```
+
+#3 Create a Corpus for the file
+
+```{r}
+library(tm)
+docs <- data.frame(doc_id = c(doc$Type),
+                   text = c(doc$Text),
+                   stringsAsFactors = FALSE)
+
+
+corpus <- Corpus(DataframeSource(docs))
+# Read positive dataset
+
+corpus
+```
+
+```{r}
+corpus <- corpus[-c(5575)]
+```
+
+
+
+#4 Preprocess
+
+```{r}
+library(dplyr)
+
+file_summary <- corpus %>% 
+  summary() %>%
+  as.data.frame() %>%
+  filter(Var2=="Length") %>%
+  select(Var1) %>% rename(file_name = Var1)
+
+head(file_summary)
+```
+
+
+```{r}
+library(magrittr)
+
+# Show the content of the first document
+corpus[[1]]$content %>%
+strwrap() %>% head()
+```
+
+```{r}
+# strip whitspace from the documents in the collection
+corpus <- tm_map(corpus, stripWhitespace)
+
+# Show the content of the first document
+corpus[[1]]$content %>%
+strwrap() %>% head()
+```
+
+
+```{r}
+# convert uppercase to lowercase in the document collection
+corpus <- tm_map(corpus, tolower)
+
+# Show the content of the first document
+corpus[[1]]$content %>%
+strwrap() %>% head()
+```
+
+```{r}
+# remove numbers from the document collection
+corpus <- tm_map(corpus, removeNumbers)
+
+# Show the content of the first document
+corpus[[1]]$content %>%
+strwrap() %>% head()
+```
+
+```{r}
+# Convert encoding to UTF8
+corpus = tm_map(corpus,content_transformer(function(x) iconv(x, to='ASCII', sub='')))
+
+# Using a standard list, remove English stopwords from the document collection
+corpus <- tm_map(corpus, removeWords, stopwords("english"))
+
+# Show the content of the first document
+corpus[[1]]$content %>%
+strwrap() %>% head()
+```
+
+```{r}
+# remove punctuation from the document collection
+corpus <- tm_map(corpus, removePunctuation)
+
+# Show the content of the first document
+corpus[[1]]$content %>%
+strwrap() %>% head()
+```
+
+```{r}
+# Stemming
+corpus <- tm_map(corpus, stemDocument, language = "english")
+
+# Show the content of the first document
+corpus[[1]]$content %>%
+strwrap() %>% head()
+
+```
+
+```{r}
+library(wordcloud)
+library(RColorBrewer)
+
+# Word cloud for the whole copus (40 documents)
+wordcloud(corpus, 
+          max.words = 150,
+          random.order = FALSE,
+          colors = brewer.pal(8, "Dark2"))
+
+```
+
+```{r}
+# Create terms-documents matrix
+tdm <- TermDocumentMatrix(corpus)
+inspect(tdm)
+```
+
+```{r}
+# Find top terms that occur at least 50 times 
+top_words <- findFreqTerms(tdm, 50)
+
+top_words
+```
+
+```{r}
+# Create a TF-IDF matrix using the top words
+tfidf <- DocumentTermMatrix(corpus,
+                            control = list(dictionary = top_words,
+                                           weighting = weightTfIdf))
+inspect(tfidf)
+
+```
+
+```{r}
+# Convert document-term matrix as data frame
+df <- tfidf %>% as.matrix() %>% as.data.frame()
+
+# Show the head of the first 10 columns
+head(df[,1:10])
+
+```
+
+```{r}
+
+df$spamham <- file_summary$file_name
+
+
+# Define ham (spamham = 1) and spam (spamham = 0)
+df$spamham <- ifelse((df$spamham == "ham"), 1, 0)
+
+df$spamham <- factor(df$spamham,
+                          levels = c(0,1),
+                          labels = c("SPAM","HAM"))
+head(df)
+```
+
+
+```{r}
+# Show the summary of the last 20 columns
+summary(df[,(length(df)-19):length(df)])
+```
+
+```{r}
+library(caret)
+
+set.seed(1234)
+
+trainIndex <- createDataPartition(df$spamham, p = .3, list = FALSE)
+head(trainIndex)
+
+train_data <- df[trainIndex,]
+test_data <- df[-trainIndex,]
+
+m1 <- lm(spamham ~ ., data = train_data)
+
+# Make predictions
+x_test <- test_data[,-163]
+y_test <- test_data[,163]
+
+predictions <- predict(m1, test_data)
+
+# Summarize results
+postResample(predictions,y_test)
+```
+
+```{r}
+## Train a logistic regression model using 10-fold cross-validation
+fitControl <- trainControl(method = "cv",number = 10)
+
+set.seed(123)
+logit_fit <- train(spamham ~ ., data = df,
+                   trControl = fitControl,
+                   method="glm", family=binomial(link='logit'),
+                   control = list(maxit = 50))
+
+print(logit_fit)
+
+confusionMatrix(logit_fit)
+```
+
+```{r}
+# Train Naive Bayes with 10-fold Cross-Validation
+set.seed(123)
+nn_fit <- train(spamham ~ ., data = df,
+                trControl = fitControl,
+                preProcess = c("center", "scale"),
+                method = "naive_bayes")
+
+print(nn_fit)
+
+confusionMatrix(nn_fit)
+```
+
+
+```{r}
+# Collect resamples
+resamps <- resamples(list(Logit=logit_fit, NaiveBayes = nn_fit))
+
+summary(resamps)
+```
+
+

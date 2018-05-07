@@ -1,0 +1,343 @@
+---
+title: 'Market Segmentation'
+author: "Langtao Chen"
+date: "November 12, 2017"
+output: 
+  pdf_document: 
+    toc: yes
+    toc_depth: 3
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+&nbsp;
+&nbsp;
+
+**Note**: In order to run this demo, the following R packages must be installed in your R environment:
+
+- dplyr: data manipulation
+- fpc: flexible procedures for clustering
+- cluster: methods for cluster analysis
+
+
+\newpage
+
+```{r}
+# Clean the environment
+rm(list = ls())
+
+```
+
+# 1. Understand Dataset
+
+The original dataset downloaded from https://archive.ics.uci.edu/ml/datasets/Online+Retail is stored in Excel. We can convert it into a CSV file and then use read.csv() method to read in the raw dataset.
+
+```{r}
+# Read in transaction dataset
+df = read.csv("Online_Retail.csv", stringsAsFactors = FALSE)
+str(df)
+```
+
+This is a transnational data set which contains all the transactions occurring between 12/1/2010 and 12/9/2011 for a UK-based and registered non-store online retail. The company mainly sells unique all-occasion gifts. Many customers of the company are wholesalers.
+
+Attributes include:
+
+- *InvoiceNo*: Invoice number. Nominal, a 6-digit integral number uniquely assigned to each transaction. If this code starts with letter 'c', it indicates a cancellation.
+
+- *StockCode*: Product (item) code. Nominal, a 5-digit integral number uniquely assigned to each distinct product.
+
+- *Description*: Product (item) name. Nominal.
+
+- *Quantity*: The quantities of each product (item) per transaction. Numeric.
+
+- *InvoiceDate*: Invice Date and time. Numeric, the day and time when each transaction was generated.
+
+- *UnitPrice*: Unit price. Numeric, Product price per unit in sterling.
+
+- *CustomerID*: Customer number. Nominal, a 5-digit integral number uniquely assigned to each customer.
+
+- *Country*: Country name. Nominal, the name of the country where each customer resides.
+
+
+
+```{r}
+# Show the head of the raw dataset
+head(df)
+
+```
+
+Check the unique values of country.
+
+```{r}
+unique(df$Country)
+
+```
+
+
+Let's check the summary statistics of the dataset.
+```{r}
+summary(df)
+```
+
+We notice that there are 135,080 missing values for customer ID. As customer ID is a key information for market segmentation, we remove the observations that do not have customer ID.
+
+```{r}
+library(dplyr)
+# Remove observations with missing customer ID
+df <- filter(df, is.na(df$CustomerID)==FALSE)
+
+# Show the structure of the new dataset
+str(df)
+```
+
+Check the summary statistics again.
+
+```{r}
+summary(df)
+```
+
+We notice that some orders have negative quantity. Why? Let's print out some invoice numbers of those negative quantity orders.
+
+```{r}
+df %>% filter(Quantity < 0) %>% 
+  head()
+```
+
+It seems that the return orders (invoice numbers starting with "C") are recorded as negative quantities. We can confirm this guess by the following code.
+
+```{r}
+# Get the observations with negative quantity
+df2 <- df %>% filter(Quantity < 0)
+
+# Get the first character of invoice number
+substr(df2$InvoiceNo, start=1, stop=1) %>% unique()
+
+# Remove the temporary object
+rm(df2)
+```
+
+Since the InvoiceDate is stored as strings, it's not easy to calculate time-related statistics. Let's convert it as a datetime column.
+
+```{r}
+df$InvoiceDate <- as.POSIXct(df$InvoiceDate, format = "%m/%d/%Y %H:%M")
+
+summary(df$InvoiceDate)
+```
+
+# 2. Preprocess Data: Data Reduction Using RFM Analysis
+
+## 2.1. Aggregate data to cusomer level and calculate RFM
+
+RFM (Recency, Frequency, Monetary value) analysis is a popular technique to market segmentation. Here we use the RFM analysis to reduce the dataset. This is especially useful when we have a dataset with a huge number of observations and many variables.
+
+By using RFM analysis as data reduction method, we calculate the following 3 characteristics and use these 3 characteristics to cluster all customers.
+
+- *Recency*: How recently did the customer purchase?
+- *Frequency*: How often do they purchase?
+- *Monetary Value*: How much do they spend?
+
+**Note:** In practice, we can rely on original variables to do the clustering analysis, or use the reduced dataset to conduct the clustering analysis. Here, we choose to just use the reduced dataset because: (1) the RFM method is a mature method for market segmentation, and (2) the meanings of the new variables (i.e., recency, frequency, and monetary value) are easy to interpret.
+
+Since the market segmentation that we are doing here is at individual customer level, we need to aggregate the original transactional level data into the customer level.
+
+We can measure recency as the number of days before which the recent purchase of a customer happened. We don't consider return invoices in calculating RFM.
+
+```{r}
+df_customer <- df %>% filter(Quantity > 0) %>%
+  group_by(CustomerID) %>%
+  summarise(Recent_Purchase = as.numeric(as.character(as.Date("2011-12-10")-max(as.Date(InvoiceDate)))),
+            Purchase_Freq = length(unique(InvoiceNo)),
+            Monetary_Value = sum(Quantity*UnitPrice)
+            )
+
+str(df_customer)
+```
+
+Show the head of the customer level dataset.
+
+```{r}
+head(df_customer)
+```
+
+## 2.2. Check aggregation logic
+
+To check if the aggregation is correct, let's just check one customer ID 12347.
+
+```{r}
+df_12347 <- df %>% filter(CustomerID=="12348")
+print(df_12347)
+```
+
+```{r}
+# Number of invoices
+unique(df_12347$InvoiceNo)
+```
+```{r}
+# How many days since the most recent purchase
+as.Date("2011-12-10") - as.Date(max(df_12347$InvoiceDate))
+```
+```{r}
+# Monetary value
+df_12347$Value <- df_12347$Quantity*df_12347$UnitPrice
+sum(df_12347$Value)
+```
+By checking one particular customer ID 12347, we did not find problem for the data aggregation process.
+
+## 2.3. Transform RFM data
+
+Summary statistics of the customer level dataset.
+
+```{r}
+summary(df_customer)
+```
+
+It seems the RFM are not normally distributed. Let's plot the distribution.
+
+```{r}
+par(mfrow=c(2,2))
+hist(df_customer$Recent_Purchase)
+hist(df_customer$Purchase_Freq)
+hist(df_customer$Monetary_Value)
+
+```
+
+
+From the above histograms, we find that the RFM variables are skewed. Let's log-transform the data.
+
+```{r}
+# Log transform recency
+df_customer$Recent_Purchase_log <- log(df_customer$Recent_Purchase)
+
+# Log transform frequency
+df_customer$Purchase_Freq_log <- log(df_customer$Purchase_Freq)
+
+# Log transform monetrary value
+df_customer$Monetary_Value_log <- log(df_customer$Monetary_Value + 1)
+```
+
+**Note**: As the monetary value column contains zeros, we use log(x+1) to transform the variable.
+
+Plot histograms for the log-transformed variables.
+
+```{r}
+par(mfrow=c(2,2))
+hist(df_customer$Recent_Purchase_log)
+hist(df_customer$Purchase_Freq_log)
+hist(df_customer$Monetary_Value_log)
+```
+
+Show the summary statistics of the log transformed dataset.
+
+```{r}
+df_customer %>% 
+  select(CustomerID, Recent_Purchase_log, Purchase_Freq_log, Monetary_Value_log) %>%
+  summary()
+```
+
+
+Also the scales of these three variables are quite different. The similarity/distance measures used in the clustering process are highly influenced by the scale of each variable. It is therefore preferred to normalize the variables before conducting cluster analysis. You can use the formula $X_{norm}=\frac{X-Mean(X)}{SD(X)}$ to manually normalize the variable. Here, we use the caret R package to normalize variables.
+
+```{r}
+# Normalize RFM variables
+library(caret)
+
+# create the pre-process parameters from the dataset
+preprocessParams <- preProcess(df_customer[,-c(1:4)], method = c("center", "scale"))
+# summarize transform parameters
+print(preprocessParams)
+
+```
+
+```{r}
+# Transform the dataset using the parameters
+df_customer_scaled <- predict(preprocessParams, df_customer[,-c(1:4)])
+
+# Summarize the scaled dataset
+summary(df_customer_scaled)
+```
+
+# 3. Hierarchical Agglomerative Clustering
+
+Here we use the Ward method to do the hierarchical clustering. Ward's method tends to result in clusters of roughly equal size4. This could be beneficial in many applications.
+
+```{r}
+# Calculate distance matrix
+d <- dist(df_customer_scaled, method = "euclidean") 
+
+# Hierachical clustering using Ward mwethod
+fit_h <- hclust(d, method="ward.D")
+
+# Show the dendogram
+plot(as.dendrogram(fit_h)) 
+
+# Cut the clustering tree into 6 clusters
+groups <- cutree(fit_h, k=6)
+
+# Add borders around the 6 clusters to the dendogram
+rect.hclust(fit_h, k=6, border="blue")
+
+```
+
+Let's plot the clustering results.
+
+```{r}
+library(fpc)
+plotcluster(df_customer_scaled, groups)
+```
+
+
+One challenge of clustering analysis is to reasonably interpret the clustering results. One way is to get the summary statistics from each cluster. We may be able to label the clusters based on the summary statistics.
+
+```{r}
+# Summary statistics by cluster
+
+cbind(df_customer, groups) %>% 
+  group_by(groups) %>%
+  summarise(avg_recency = mean(Recent_Purchase),
+            avg_frequency = mean(Purchase_Freq),
+            avg_monetary = mean(Monetary_Value))
+
+```
+
+From the summary statistics, it seems that the customers in cluser 2 are most important to the company, while cluster 4 customers are least important.
+
+# 4. K-Means Clustering
+
+Now, let's use fit a 6-cluster k-means model to the scaled dataset.
+
+```{r}
+# K-Means clustering with 6 clusters
+fit_km <- kmeans(df_customer_scaled, 6)
+```
+
+Let's visualize the clustering result.
+
+```{r}
+# Plot against the 1st two principal components
+library(cluster)
+clusplot(df_customer_scaled, fit_km$cluster, color=TRUE, shade=TRUE, 
+  	labels=2, lines=0)
+
+```
+
+```{r}
+# Plot against the 1st two discriminant functions
+library(fpc)
+plotcluster(df_customer_scaled, fit_km$cluster, main="Six-Cluster Solution")
+```
+
+```{r}
+# Summary statistics by cluster
+
+cbind(df_customer, cluster = fit_km$cluster) %>% 
+  group_by(cluster) %>%
+  summarise(avg_recency = mean(Recent_Purchase),
+            avg_frequency = mean(Purchase_Freq),
+            avg_monetary = mean(Monetary_Value))
+
+```
+
+We notice that the hirarchical and k-means clustering algorithms come up with different solutions.
+

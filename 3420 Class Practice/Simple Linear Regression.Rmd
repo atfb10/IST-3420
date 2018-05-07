@@ -1,0 +1,100 @@
+---
+title: "Simple Linear Regression"
+author: "Langtao Chen"
+date: "Oct 27, 2017"
+output: 
+  pdf_document: 
+    toc: yes
+    toc_depth: 3
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, Message = F)
+```
+
+&nbsp;
+&nbsp;
+
+
+\newpage
+
+
+```{r}
+# Clean the environment
+rm(list = ls())
+```
+
+
+# 1. Read in Data
+
+In this example, we'll use the shoesize dataset to demonstrate how to conduct simple regression analysis.
+
+```{r}
+df <- read.csv("shoesize.csv")
+```
+
+```{r}
+head(df)
+```
+
+```{r}
+# Remove the index column
+df$Index <- NULL
+str(df)
+```
+
+# 2. Explore Data
+
+Before conducting regression analysis, we can draw a scatterplot matrix to explore the relationships between variables.
+
+```{r}
+# plot(df)
+```
+
+From the above scatterplot matrix, we see a clear positive linear relationship between shoe size and the person's height. Let's zoom in this relationship.
+
+```{r}
+plot(x = df$Height, y = df$Size, col = "red",
+     xlab = "Height", ylab = "Shoe Size")
+```
+
+# 3. Simple Linear Regression
+
+With the visualization of linear relationship between shoe size and height, now let's formally use linear regression model to analyze this linear relationship.
+
+```{r}
+# Regress shoe size on height
+model1 <- lm(Size ~ Height, data = df)
+
+# Show the result
+summary(model1)
+```
+
+Though the summary() provides us everything about the linear regression analysis, the output is not professional and not easy to read.
+
+Let's use the stargazer package to report regression results in a more professional way.
+
+```{r}
+# install.packages("stargazer") #Install stargazer package, do this only once
+library(stargazer)
+```
+
+
+```{r}
+stargazer(model1, type = "text", star.cutoffs = c(0.05, 0.01, 0.001),
+          title="Simple Linear Regression", digits=4)
+```
+
+
+The effect of height on shoe size is significant (p-value < 0.05). If height increases by one inch, shoe size would increase by 0.43 unit on average. 75.85% of the variance of shoe size can be explained by height.
+
+From the regression result, we can build the following relationship between shoe size and height:
+
+ShoeSize = -19.3266 + 0.4273*Height
+
+We can use this formula to predict shoe size if a person's height is provided. For example, if Tommy is 79 inches in height, then the shoe size is predicted as:
+
+```{r}
+cat("Shoe Size = ", -19.3266 + 0.4273*79)
+```
+

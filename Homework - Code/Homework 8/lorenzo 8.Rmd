@@ -1,0 +1,80 @@
+---
+title: "Homework 8"
+author: "Lorenzo Lewis"
+date: "10/16/2017"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+Clear the global environment
+```{r}
+rm(list=ls())
+```
+
+Load in required libraries
+```{r}
+library(dplyr)
+library(tidyr)
+library(ggplot2)
+```
+
+# 2
+Read the data file into R
+```{r}
+df <- read.csv("mst_enrollment2015.csv")
+```
+
+# 3
+Use dplyr::filter() to remove all non-US data.
+```{r}
+mst <- dplyr::filter(df, Country == "United States")
+```
+
+# 4
+Use dplyr::filter() to remove data of Missouri (in-state enrollment)
+```{r}
+mst <- dplyr::filter(df, State != "Missouri")
+```
+
+# 5
+Use tidyr package to reshape the dataset by transforming it from wide format to long format, using "Year" as key and "Enroll" as value. 
+```{r}
+mst <- gather(df, Year, Enroll, X2011, X2012, X2013, X2014, X2015)
+```
+
+# 6
+Use dplyr package to aggregate enrollment data into state level, i.e. calculate total enrollment for each state. 
+```{r}
+mst <- group_by(df, State)
+mst <- summarize(df, pop = sum(Enroll))
+```
+
+#8
+Use ggplot2 package to draw the MST out-of-state enrollment plot on the US states map.
+
+Prepare the dataset
+```{r}
+us_states <- map_data("state")
+colnames(df)[1] <- "region"
+df$region <- tolower(df$region)
+df <- df[(df$region %in% us_states$region),]
+us_states <- left_join(df, us_states, by = "region")
+```
+
+Plot the dataset
+```{r}
+ggplot(data = us_states) +
+  geom_polygon(aes(x = long, y = lat, fill = pop, group = group), color = "white") +
+  coord_fixed(1.3) +
+  labs(title = "Missouri S&T Out of State Enrollment",
+       fill = "Enrollment",
+       x = "",
+       y = "") +
+  scale_x_continuous(breaks = c()) +
+  scale_y_continuous(breaks = c())
+```
+
+

@@ -1,0 +1,65 @@
+---
+title: "In class Exercise 5"
+author: "Adam Forestier"
+date: "September 13, 2017"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# 1. Read in data
+
+Clean the current environment
+```{r}
+rm(list = ls())
+```
+
+We can read.csv() function to read in the data.
+
+```{r}
+mst_enroll <- read.csv(file = "mst_enrollment2015.txt",
+                       sep = "\t")
+  
+```
+
+# 2. Explore the Data
+
+Show the first 5 records.
+
+```{r}
+head(mst_enroll, n = 5)
+```
+ Show the last 10 records.
+ 
+ 
+```{r}
+tail(mst_enroll, n = 10)
+```
+
+Show the summary statistics of the dataset 
+
+```{r}
+summary(mst_enroll)
+```
+
+
+Show the total enrollment for each year. 
+
+```{r}
+sum(mst_enroll$X2011)
+sum(mst_enroll$X2012)
+sum(mst_enroll$X2013)
+sum(mst_enroll$X2014)
+sum(mst_enroll$X2015)
+```
+
+Save the dataset as a CSV file "mst_enrollment2015.csv"
+
+```{r}
+write.csv(mst_enroll, 
+          file = "mst_enrollment2015.csv",
+          row.names = FALSE)
+```
+

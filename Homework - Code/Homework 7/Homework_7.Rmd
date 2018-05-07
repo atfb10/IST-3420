@@ -1,0 +1,135 @@
+---
+title: "Homework 7"
+author: "Adam Forestier"
+date: "October 17, 2017"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, message = F)
+```
+
+Clear the Environment
+```{r}
+rm(list = ls())
+```
+
+Load in packages
+```{r}
+require(jsonlite)
+require(dplyr)
+```
+
+set directory
+```{r}
+setwd("D:/College Work/Junior Year/IST 3420/Homework - Code/Homework 7")
+```
+
+
+# Read in JSON File Data
+
+```{r}
+# Read in data
+json_df <- stream_in(file("weblog_clean.jsonl"))
+```
+
+# Change request.datetime as POSIXct  
+```{r}
+json_df <- json_df %>% mutate(request.datetime = as.POSIXct(request.datetime))
+```
+
+# Show summary statistics
+```{r}
+summary(json_df)
+```
+
+
+# Calculate Frequency distribution of weekday
+```{r}
+# Calculate frequency distribution of weekday and put it in column format ordered greatest to least
+day_freq <- cbind(table(json_df$weekday))
+day_freq <- cbind(day_freq[order(-day_freq),])
+print(day_freq)
+```
+
+# Crosstabulate weekday and request.uri. 
+```{r}
+cross_tbl <- xtabs(~ request.uri + weekday, data=json_df)
+print(cross_tbl)
+```
+
+# Bar plot to show the distribution of visits by weekday
+```{r}
+# Create table
+weekday_distribution <- table(json_df$weekday)
+
+# Bar graph
+barplot(weekday_distribution,
+        las = 2,
+        main="Distribution of Visits by Weekday",
+        col=rainbow(7))
+```
+
+# Stacked bar plot to show the distribution of visits by request.uri and request.method 
+```{r}
+# Create Table 
+request_info <- table(json_df$request.uri, json_df$request.method)
+
+# Stacked Bar
+barplot(request_info,
+        main="Distribution of Visits by request.uri and request method",
+        xlab = "Request Method",
+        col = rainbow(6),
+        ylim = c(0, 140000),
+        legend = rownames(request_info))
+```
+
+
+# Pie chart to present the distribution of visits by request.uri by count
+```{r}
+# Create Table
+uri_request <- table(json_df$request.uri)
+
+# Create Label to include on pie chart
+pie1_lbl <- paste(names(uri_request), " \n", uri_request, sep="")
+
+pie(uri_request,
+    labels = pie1_lbl,
+    main = "Pie Chart with URI Visitor Count",
+    col = rainbow(length(pie1_lbl)))
+```
+
+# Pie chart to present the distribution of visits by request.uri by perecentage
+```{r}
+# Create percent and label
+pct <- round(uri_request/sum(uri_request)*100, digits = 1)
+pie2_lbl <- paste(names(uri_request), " \n", paste(pct,"%"), sep="")
+
+pie(uri_request,
+    labels = pie2_lbl,
+    main = "Pie Chart with URI Percentage of Visitors",
+    col = rainbow(length(uri_request)))
+```
+
+# Five-number summary for "response.size". 
+```{r}
+# Create df with the response size column going from smallest to largest
+ordered_size_df <- json_df[order(json_df$response.size),]
+
+quantile(ordered_size_df$response.size, type = 7)
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

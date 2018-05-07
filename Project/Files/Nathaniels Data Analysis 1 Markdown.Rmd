@@ -1,0 +1,291 @@
+---
+title: "IMDb Exploratory Analysis - Milestone M2"
+author: "Adam Forestier, Brandon Jones, Nathaniel Williams, Parika Gupta"
+date: "October 15, 2017"
+output:
+  html_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, message = FALSE)
+```
+
+# Introduction
+
+The primary goal of our project is to determine if we can closely predict movie ratings before critic ratings are released and the films are given an average user score on IMDb. Being able to determine whether or not a movie will be a quality release without critic ratings could address a number of business problems that surround the financing and marketing strategies for different types of movies. Film studios and movie theatres could use these insights to budget accordingly and properly advertise movies to maximize popularity, ratings, and profits. The dataset we will be using contains 5,043 movies, and 28 variables related to the movie.
+
+The primary research questions we wish to ask revolve around predicting a movie's IMDb score. One of which is will the number of faces in a movie poster correlate with the movie's rating? Can the multiple actor variables and the director variable be useful in predicting a movie's IMDb score? Does a movie's parental guidance rating (meaning R, PG-13, etc.) play into how well a movie scores? Does a movie's budget help determine a movie's critical success? Do certain genres tend to receive higher critic scores?
+
+The secondary questions we are interested in solving revolve around being able to determine a movie's revenue based on the following criteria: Do different genres of movie play into a film's revenue total? Do critic scores determine how much a movie grosses? Does the number of faces on a poster play into how much a movie grosses? How much do popular actors and directors determine a movie's financial success?
+
+Tertiary questions we wish to investigate are general questions about how variables relate to each other. We wish to find out if different nation's films tend to have different duration times. We would like to see how gross compares to budget and determine what budget expenditure typically leads to the best returns ratio-wise. We also would like to determine what key plot words are used most commonly, and if they lead to commercial and critical success.
+
+# Data Source and Collection
+
+Our data was retrieved as a CSV file from Kaggle:
+
+https://www.kaggle.com/deepmatrix/imdb-5000-movie-dataset
+
+The data was retrieved by scraping 28 values for 5043 movies from the IMDb website and by using facial recognition software run on 4906 posters. The movies' release dates span over 100 years and the movies originate from 66 different countries. The variables of the dataset are as follows:
+
+* movie_title 
+* color num_critic_for_reviews 
+* movie_facebook_likes 
+* duration 
+* director_name 
+* director_facebook_likes 
+* actor_3_name 
+* actor_3_facebook_likes 
+* actor_2_name 
+* actor_2_facebook_likes 
+* actor_1_name 
+* actor_1_facebook_likes 
+* gross 
+* genres 
+* num_voted_users 
+* cast_total_facebook_likes 
+* facenumber_in_poster 
+* plot_keywords 
+* movie_imdb_link
+* num_user_for_reviews 
+* language 
+* country 
+* content_rating 
+* budget 
+* title_year 
+* imdb_score 
+* aspect_ratio
+
+Some of our data will need to be cleansed before moving on to analysis. The variable "director_facebook_likes" is inaccurate in many instances. Foreign films using currencies different from USD may have a misrepresented gross revenue, because the values aren't equivalent with foreign currencies. This can be addressed by transforming these values by an exchange rate. We would also like to retrieve the release date for each film, since that variable was not included in the original dataset.
+
+The goal of our project is to find connections between variables and the film's IMDb score. We believe that the key variables are the following: facenumber_in_poster, director_name, actor_1_name, actor_2_name, and actor_3_name. Our hypothesis is that these variables will be crucial in predicting a movie's overall critic score. We also hypothesize that budget, gross, actors, directors, genre and content rating will play into how much a movie grosses in revenue.
+
+# Preparation work 
+
+Clear the environment:
+```{r}
+rm(list = ls())
+```
+
+Load in Packages:
+```{r}
+# Note: User may need install the required packages
+library(ggplot2)
+library(plyr)
+library(dplyr)
+library(plotly) 
+library(corrplot)
+```
+
+# Read in Data 
+
+Load CSV data to data frame:
+```{r}
+movie_df <- read.csv(file = "movie_metadataCSV.csv", header = TRUE)
+```
+
+Show the initial structure of the data frame:
+```{r}
+str(movie_df)
+```
+
+# Data Cleansing and Transformation
+
+Most of the variables for the IMDb data set were formatted correctly to begin with, but some cleansing was required. 
+
+We created a new variable that calculated the gross profit of a film by subtracting the budget of the film from the gross revenue. This will allow us to perform analyses later on and see how other factors may affect the profit of movies.
+```{r}
+# Create new vector, positive means budget was lower than gross, negative means that budget exceeds gross
+gross_profit <- movie_df$gross - movie_df$budget
+
+# bind the vector profit to the data frame
+movie_df <- cbind(movie_df, gross_profit)
+```
+
+The values of the "movie_title" variable in our data set had the character "Â" appended at the end and white space at the end, so we removed the character and trimmed the white space for better readability and to prevent any issues that might have arisen without eliminating the extra white space. 
+```{r}
+# Remove the Â at the end of the titles
+movie_df$movie_title <- gsub("Â", "", movie_df$movie_title)
+
+# Trim off the whitespace
+movie_df$movie_title <- trimws(movie_df$movie_title)
+```
+
+There were also a number of duplicated values of movies, so we checked for redundant data and removed duplicate entries.
+
+First we need to check to see if duplicated movie_titles values exist.
+```{r}
+# Show the original total number of titles, including duplicates
+length(movie_df$movie_title)
+
+# Show number of unique titles
+length(unique(movie_df$movie_title))
+
+# Show number of duplicated titles, some of which may be included 2 or more times
+anyDuplicated(movie_df$movie_title)
+```
+
+After verifying redundant values exist, We need to remove duplicates to avoid skew in our analysis.
+```{r}
+# This statement removes movie titles that are duplicates
+movie_df <- movie_df[!duplicated(movie_df$movie_title),]
+```
+
+Show the summary statistics now that the dataset has been cleansed.
+```{r}
+summary(movie_df)
+```
+
+# Correlation
+
+We chose to use Pearson Correlation, because the measures are not ordinal, and measures are linear
+
+Pearson Correlation Table 1
+
+```{r}
+# Create data frame with only numeric types to see how variables correlate to imdb score 
+numeric_df <- select_if(movie_df, is.numeric) # Other option cor(movie_df[sapply(movie_df, is.numeric)])
+
+# Creates a correlation table showing variables correlate w/ each other by number and text color 
+num_correlation <- round(cor(numeric_df, use = "pairwise.complete.obs", method = "pearson"),1)
+corrplot(num_correlation, method = "number", type = )
+
+# Note: After running this chunk, you can also select hte num_correlation item from the global environment to view a generic table
+```
+
+Pearson Correlation Table 2
+
+```{r}
+# Creates a correlation table showing variables correlate w/ each other by color and  circle size
+corrplot(num_correlation, method = "circle")
+```
+
+# Linear Regresssion Models based on correlation
+
+Linear Regression Model based on how num_voted_users relates to score
+```{r}
+# Create smaller data frame so there is not an overwheliming amount of values 
+small_movie_df <- head(movie_df, n = 500)
+
+# Linear regression using ggplot2
+ggplot(small_movie_df, aes(x = num_voted_users, y = imdb_score)) +
+  geom_point(shape = 1) +
+  geom_smooth(method = lm) +
+  ggtitle("Voted User & Score Linear Regression")+
+  ylab("IMDB Score") +
+  xlab("Voted Users")
+```
+
+
+Number of movie facebook likes seems closely related with # of critic reviews, let's take a look
+```{r}
+ggplot(small_movie_df, aes(x = movie_facebook_likes, y = num_critic_for_reviews)) +
+  geom_point(shape = 1) +
+  geom_smooth(method = lm, color = "Green") +
+  ggtitle("Facebook Likes and # of Critc Reviews Regression") +
+  ylab("# of Critic Reviews") +
+  xlab("Movie Likes on Facebook")
+```
+
+
+# Data Visualization and findings
+
+Find year with highest average score
+
+```{r}
+# Create data frame with year and average score
+yearly_score <- ddply(movie_df, c("title_year"), summarise,
+                      mean(imdb_score, na.rm = TRUE))
+colnames(yearly_score) <- c("title_year", "avg_score")
+
+# Plotly line graph that shows average imdb scores across the years
+plot_ly(yearly_score, x = yearly_score$title_year, y = yearly_score$avg_score, type = "scatter", mode = "lines") %>% 
+  layout(title = "Year and Score")
+```
+
+Find out which actors have the highest average movie score
+```{r}
+# Find actors with highest average movie score 
+actor_rating_df <- ddply(movie_df, c("actor_1_name"), summarise, # Pull out actor 1 and rating data
+                      actor_m <- mean(imdb_score, na.rm = TRUE),  # Find the mean of actors and discount na values
+                      number <- length(na.omit(imdb_score))) # Count number of movies, but omit na values
+colnames(actor_rating_df) <- c("actor_name", "avg_score", "num_of_movies") # Rename headers
+actor_avg <- actor_rating_df[which(actor_rating_df$num_of_movies >= 7),]# Actors in at least 7 movies to avoid skew
+actor_avg <- actor_avg[which(actor_avg$avg_score >= 7.15),] # Show only highest scoring actors for readability
+
+# Convert actor_name to a factor
+actor_avg$actor_name <- factor(actor_avg$actor_name)
+
+# Show highest to lowest average score
+actor_avg$actor_name <- reorder(actor_avg$actor_name, actor_avg$avg_score)
+
+# Visualization of highest scoring actors
+ggplot(actor_avg, aes(x = avg_score, y = actor_name)) + # Sets x to average score and y to the name
+  geom_point(aes(colour = actor_name)) + # Makes a point graph with different colors per actor
+  theme(axis.text = element_text(size = 10)) + # Sets font size
+  ggtitle("Actor Scores") + # Changes chart title
+  xlab("Average Score") + # Changes x field title
+  ylab("Actor Name")  # Changes y field table
+```
+
+Find out which directors have the highest average movie score
+```{r}
+# Find actors with highest average movie score 
+dir_rating_df <- ddply(movie_df, c("director_name"), summarise, # Pull out director name and rating data
+                      dir_m <- mean(imdb_score, na.rm = TRUE),  # Find the mean of directors and discount na values
+                      number <- length(na.omit(imdb_score))) # Count number of movies, but omit na values
+colnames(dir_rating_df) <- c("director_name", "avg_score", "num_of_movies") # Rename headers
+dir_avg <- dir_rating_df[which(dir_rating_df$num_of_movies >= 7),]# Direct  at least 7 movies to avoid skew
+dir_avg <- dir_avg[which(dir_avg$avg_score >= 7.5),] # Show only highest scoring directors for readability
+dir_avg <- dir_avg[which(dir_avg$director_name != ''),] # Exclude movies who have no director name 
+
+# Convert actor_name to a factor
+dir_avg$director_name <- factor(dir_avg$director_name)
+
+# Show highest to lowest average score
+dir_avg$director_name <- reorder(dir_avg$director_name, dir_avg$avg_score)
+
+# Visualization of highest scoring actors
+ggplot(dir_avg, aes(x = avg_score, y = director_name)) + # Sets x to average score and y to the name
+  geom_point(aes(colour = director_name)) + # Makes a point graph with different colors per director
+  theme(axis.text = element_text(size = 10, colour = 'black')) + # Sets font size
+  ggtitle("Director Scores") +  # Changes chart title
+  xlab("Average Score") + # Changes x field title
+  ylab("Director Name") # Changes y field table
+```
+
+Find out the average Imdb score based on content rating
+```{r}
+content_df <- ddply(movie_df, c("content_rating"), summarise, # New DF w/ rating, avg score and # of movies 
+                    mean(imdb_score, na.rm = TRUE), # Creates column containing mean scores
+                    length(na.omit(imdb_score))) # Omits scores with NA values
+colnames(content_df) <- c("content_rating", "avg_score", "number_of_films") # Rename columns
+content_df <- content_df[which(content_df$content_rating != ""),] # Eliminate films from analysis without rating
+
+# Visualization of average score by content rating
+ggplot(content_df, aes(x = content_rating, y = avg_score)) + # Bar graph with x as rating and y as score
+  geom_bar(stat = "identity", width = .5, fill = 'deepskyblue3') + # Creates space between bars and changes color
+  theme(axis.text = element_text(size = 8, colour = 'black', angle = 90)) + # Sets text size to 8, text color to black, and angles text for separation purposes
+  ggtitle("Content Scores") + # Title of graph
+  xlab("Content Rating") + # Title of x axis
+  ylab("IMDB Score") # Title of y axis
+```
+
+Show spread of scores to detect if outliers could be effecting the content score averages
+```{r}
+# Create data frame that excludes movies with no content rating 
+content_df2 <- movie_df[which(movie_df$content_rating != ''), ]
+
+#Use plotly for great boxplot capabilities, note: Might need to install "plotly"
+plot_ly(content_df2, x = content_df2$imdb_score, color = content_df2$content_rating, type = "box") %>%
+  layout(title = "Movie Type and Score Range")
+```
+
+
+
+
+
+
+
+
+

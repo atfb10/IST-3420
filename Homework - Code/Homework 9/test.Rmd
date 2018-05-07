@@ -1,0 +1,48 @@
+---
+title: "Homework 9"
+author: "Adam Forestier"
+date: "October 23, 2017"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, message = F)
+```
+
+Clean the current environement
+```{r}
+rm(list = ls())
+```
+
+Load Packages
+```{r}
+# Used openxlsx because rJava would not load, I believe this is due to an update because I do have Java on my pc
+library(openxlsx)
+library(dplyr)
+```
+# Read the data file
+```{r}
+# Read in data
+xlsx_file <- read.xlsx("data.xlsx")
+
+# Show data
+str(xlsx_file)
+```
+
+# Calculate the pair-wise correlation coefficients
+```{r}
+cor(xlsx_file)
+```
+# boxplot rule to detect outliers in x variable
+```{r}
+box <- boxplot(xlsx_file$x)
+box
+```
+# remove all outliers of x from the dataset
+```{r}
+xlsx_file <- dplyr::filter(xlsx_file, !(x %in% box$out))
+```
+# re-calculate the pair-wise correlation coefficients on the updated dataset
+```{r}
+cor(xlsx_file)
+```

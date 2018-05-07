@@ -1,0 +1,45 @@
+---
+title: "Homework 4"
+author: "Lorenzo Lewis"
+date: "9/18/2017"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+# 1. Clear the environment variables
+```{r}
+rm(list = ls())
+```
+# 2. Load the XML library
+```{r}
+library(XML)
+library(RCurl)
+```
+# 3. Extra the data from the web and store it in the program.
+```{r}
+url <- "http://api.steampowered.com/ISteamNews/GetNewsForApp/v0002/?appid=570&count=300&maxlength=300&format=xml"
+doc <- getURL(url)
+content <- xmlParse(doc)
+top <- xmlRoot(content)
+```
+# 4. Extract and save information to variables
+```{r}
+g_gid <- xpathSApply(content, "//newsitems/newsitem/gid", xmlValue)
+g_title <- xpathSApply(content, "//newsitems/newsitem/title", xmlValue)
+g_url <- xpathSApply(content, "//newsitems/newsitem/url", xmlValue)
+g_is_external_url <- xpathSApply(content, "//newsitems/newsitem/is_external_url", xmlValue)
+g_author <- xpathSApply(content, "//newsitems/newsitem/author", xmlValue)
+g_contents <- xpathSApply(content, "//newsitems/newsitem/contents", xmlValue)
+g_feedlabel <- xpathSApply(content, "//newsitems/newsitem/feedlabel", xmlValue)
+g_date <- xpathSApply(content, "//newsitems/newsitem/date", xmlValue)
+g_feedname <- xpathSApply(content, "//newsitems/newsitem/feedname", xmlValue)
+g_feed_type <- xpathSApply(content, "//newsitems/newsitem/feed_type", xmlValue)
+g_appid <- xpathSApply(content, "//newsitems/newsitem/appid", xmlValue)
+```
+# 5. Place the app data into a data frame
+```{r}
+game_df <- data.frame(g_gid, g_title, g_url, g_is_external_url, g_author, g_contents, g_feedlabel, g_date, g_feedname, g_feed_type, g_appid)
+colnames(game_df) <- c("Game ID", "Title", "URL", "Is External URL?", "Author", "Contents", "Feed Label", "Date", "Feed Name", "Feed Type", "App ID")
+```

@@ -1,0 +1,64 @@
+---
+title: "Homework_4"
+author: "Adam Forestier"
+date: "September 18, 2017"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# 1. Check XML format of API response 
+
+# 2. Use Api to collect 300 news entries for Dota 2 
+
+Clean Current Environment
+```{r}
+rm(list = ls())
+```
+
+Acces XML and RCurl Package
+```{r}
+library(XML)
+library(RCurl)
+```
+
+Extract data from website
+```{r}
+website_url <- 
+  "http://api.steampowered.com/ISteamNews/GetNewsForApp/v0002/?appid=570&count=300&maxlength=300&format=xml"
+website_doc <- getURL(website_url)
+website_content <- xmlParse(website_doc)
+top <- xmlRoot(website_content)
+```
+
+Take the information and save to variables
+```{r}
+d_gid <- xpathSApply(website_content, "//newsitems/newsitem/gid", xmlValue)
+d_title <- xpathSApply(website_content, "//newsitems/newsitem/title", xmlValue)
+d_url <- xpathSApply(website_content, "//newsitems/newsitem/url", xmlValue)
+d_is_external_url <- xpathSApply(website_content, "//newsitems/newsitem/is_external_url", xmlValue)
+d_author <- xpathSApply(website_content, "//newsitems/newsitem/author", xmlValue)
+d_contents <- xpathSApply(website_content, "//newsitems/newsitem/contents", xmlValue)
+d_feedlabel <- xpathSApply(website_content, "//newsitems/newsitem/feedlabel", xmlValue)
+d_date <- xpathSApply(website_content, "//newsitems/newsitem/date", xmlValue)
+d_feedname <- xpathSApply(website_content, "//newsitems/newsitem/feedname", xmlValue)
+d_feed_type <- xpathSApply(website_content, "//newsitems/newsitem/feed_type", xmlValue)
+d_appid <- xpathSApply(website_content, "//newsitems/newsitem/appid", xmlValue)
+```
+
+Create Data Frame with all vectors 
+```{r}
+dota_df <- data.frame(d_gid, d_title, d_url, d_is_external_url, d_author, d_contents, d_feedlabel, d_date, 
+                      d_feedname, d_feed_type, d_appid)
+```
+
+Rename Data Frame Columns
+```{r}
+colnames(dota_df) <- c("Game ID", "Title", "URL", "External URL?", "Author", "Contents", "Feed Label",
+                       "Game Date", "Feed Name", "Feed Type", "App ID")
+```
+
+
+

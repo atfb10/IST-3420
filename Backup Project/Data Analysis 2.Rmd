@@ -1,0 +1,706 @@
+---
+title: "Data Analysis 2"
+author: "Adam Forestier, Brandon Jones, Nathaniel Williams, Parika Gupta"
+date: "December 1, 2017"
+output:
+  html_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, message = F)
+```
+
+# Introduction
+
+The primary goal of our project is to determine if we can closely predict movie ratings before critic ratings are released and the films are given an average user score on IMDb. Being able to determine whether or not a movie will be a quality release without critic ratings could address a number of business problems that surround the financing and marketing strategies for different types of movies. Film studios and movie theatres could use these insights to budget accordingly and properly advertise movies to maximize popularity, ratings, and profits. The dataset we will be using contains 5,043 movies, and 28 variables related to the movie.
+
+The primary research questions we wish to ask revolve around predicting a movie's IMDb score. One of which is will the number of faces in a movie poster correlate with the movie's rating? Can the multiple actor variables and the director variable be useful in predicting a movie's IMDb score? Does a movie's parental guidance rating (meaning R, PG-13, etc.) play into how well a movie scores? Does a movie's budget help determine a movie's critical success? Do certain genres tend to receive higher critic scores?
+
+\newpage
+
+# Data Source and Collection
+
+Our data was retrieved as a CSV file from Kaggle:
+
+https://www.kaggle.com/deepmatrix/imdb-5000-movie-dataset
+
+The data was retrieved by scraping 28 values for 5043 movies from the IMDb website and by using facial recognition software run on 4906 posters. The movies' release dates span over 100 years and the movies originate from 66 different countries. The variables of the dataset are as follows:
+
+* movie_title = Name of the movie
+* color = Whether the movie was shot in color or black and white
+* num_critic_for_reviews = How many critics reviewed the movie
+* movie_facebook_likes = How many likes the movie gained on facebook
+* duration = How long the movie lasts
+* director_name = Name of director
+* director_facebook_likes = How many facebook likes the director has received 
+* actor_3_name = Actor's name
+* actor_3_facebook_likes = How many facebook likes the actor has received 
+* actor_2_name = Actor's name
+* actor_2_facebook_likes = How many facebook likes the actor has received
+* actor_1_name = Actor's name
+* actor_1_facebook_likes = How many facebook likes the actor has received
+* gross = How much money the movie generated while in theatre
+* genres = Type of movie
+* num_voted_users = Number of critics who gave the movie a score on IMDB
+* cast_total_facebook_likes = Number of facebook likes the cast as a whole received
+* facenumber_in_poster = How many actor's faces appear in the 
+* plot_keywords = Keywords users gave for the movies plot
+* movie_imdb_link = link to movie on IMDB Page
+* num_user_for_reviews = Number of people who gave the movie a score on IMDB
+* language = Original language of movie
+* country = Country movie was made in
+* content_rating = The content rating of the movie
+* budget = Amount of money cast and crew had to make movie
+* title_year = Year movie was released
+* imdb_score = Average scire the film received
+* aspect_ratio = the ratio of the width to the height of a screen
+
+Some of our data will need to be cleansed before moving on to analysis. The variable "director_facebook_likes" is inaccurate in many instances. Foreign films using currencies different from USD may have a misrepresented gross revenue, because the values aren't equivalent with foreign currencies. This can be addressed by transforming these values by an exchange rate. We would also like to retrieve the release date for each film, since that variable was not included in the original dataset.
+```{r}
+
+```
+
+The goal of our project is to find connections between variables and the film's IMDb score. We believe that the key variables are the following: facenumber_in_poster, director_name, actor_1_name, actor_2_name, and actor_3_name. Our hypothesis is that these variables will be crucial in predicting a movie's overall critic score. We also hypothesize that budget, gross, actors, directors, genre and content rating will play into how much a movie grosses in revenue.
+
+
+# Preperation Work 
+Clear the environment 
+```{r}
+rm(list = ls())
+```
+
+Load piping Package
+```{r}
+# Note: User may need install packages if they have not previously used them
+library(magrittr)
+```
+
+Load Data Manipulation Packages
+```{r}
+library(plyr)
+library(dplyr)
+```
+
+# Read in Data 
+
+Load movie CSV file in as a data frame  
+```{r}
+movie_df <- read.csv("movie_metadataCSV.csv", header = TRUE) 
+
+# Change blank spaces to NA
+movie_df[movie_df==""] <- NA
+```
+
+
+show structure of movie_df
+```{r}
+print(str(movie_df))
+```
+
+\newpage
+
+# Data Cleansing and Manipulation
+
+Most of the variables for the IMDb data set were formatted correctly to begin with, but some cleansing was required. 
+
+See if there are any observations with NA values for title or score making analysis useles
+```{r}
+count(movie_df[!(is.na(movie_df$movie_title)) & !(is.na(movie_df$imdb_score)), ])
+```
+
+It appears that every observation has a score and title
+
+
+Convert categorical variables into factors to improve analyses
+
+Color is a factor but is currently a character type, need to change it to a number. 1 = "Color", 0 = "Black and White"
+```{r}
+movie_df$color <- ifelse(movie_df$color == "Color", 1, 0)
+movie_df$color <- as.factor(movie_df$color)
+```
+
+Convert number of faces in poster to a factor
+```{r}
+movie_df$facenumber_in_poster <- as.factor(movie_df$facenumber_in_poster)
+movie_df$title_year <- as.factor(movie_df$title_year)
+```
+
+We created a new variable that calculated the gross profit of a film by subtracting the budget of the film from the gross revenue. This will allow us to perform analyses later on and see how other factors may affect the profit of movies.
+
+create new variable gross_profit by subtracting budget from gross
+```{r}
+# Create new vector, positive means budget was lower than gross, negative means that budget exceeds gross
+movie_df$gross_profit <- movie_df$gross - movie_df$budget
+```
+
+
+The values of the "movie_title" variable in our data set had the character "Â" appended at the end and white space at the end, so we removed the character and trimmed the white space for better readability and to prevent any issues that might have arisen without eliminating the extra white space. 
+```{r}
+# Remove the Â at the end of the titles
+movie_df$movie_title <- gsub("Â", "", movie_df$movie_title) 
+
+# trim whitespace
+movie_df$movie_title <- trimws(movie_df$movie_title)
+```
+
+Check to see if there are duplicated movie titles
+```{r}
+# Show number of unique titles
+length(unique(movie_df$movie_title))
+
+# Show number of duplicated titles
+anyDuplicated(movie_df$movie_title)
+```
+
+We need to remove duplicates to avoid skew in our findings, but cannot base it just on titles as some movies have remakes. We are chose to remove films that have the same title, director, and release year, as this means that it is likeley they are duplicates 
+```{r}
+# statement will remove movies if they have duplicate titles, directors, release years and release years
+movie_df <- movie_df %>% distinct(movie_title, director_name, title_year, .keep_all = T)
+```
+
+It appears that there are 4919 unique movies; movies with unique titles, directors and release years
+
+Show updated structure of data set
+```{r}
+str(movie_df)
+```
+
+Show summary statistics now that the dataset has been cleansed
+
+Load stargazer to improve appearance of summary statistics
+```{r}
+library(stargazer)
+```
+
+
+```{r}
+stargazer(movie_df, type = "text", title = "Movie Data frame Summary Statistics")
+
+# Stargazer only shows statistics for non categorical and character types
+```
+
+\newpage
+
+# Data Visualization and Analysis
+
+Load plotly visualization package
+```{r}
+# Note: plotly package graphs are interactive
+library(plotly) 
+library(ggplot2)
+```
+
+Show the distribution of movie scores with a kernal density plot
+```{r}
+# Kernel density plot
+score_density <- density(movie_df$imdb_score) # Calculate kernel density estimate
+plot(score_density, type = "n", main = "Kernel Density Estimate of Movie Scores")
+polygon(score_density, col = "wheat")
+```
+The kernal density plot shows the density of each movie score. We can see that the most common score range is from approximately 6 to 6.5. This means that most films released will receive a score close to a 6. We need to utilize more visualization techniques to discover what causes films to reach exceptional scores to go above and beyond the average.
+
+
+We can look to see which years tend to have higher quality movies based on average IMDb scores of movies over time.
+
+```{r}
+# Create data frame with year and average score
+yearly_score <- ddply(movie_df, c("title_year"), summarise,
+                      mean(imdb_score, na.rm = TRUE))
+colnames(yearly_score) <- c("title_year", "avg_score")
+
+# Plotly line graph that shows average imdb scores across the years
+plot_ly(yearly_score, x = yearly_score$title_year, y = yearly_score$avg_score, type = "scatter", mode = "lines") %>% 
+  layout(title = "Year and Score") 
+```
+
+Up until the 1970s, only a few movies may be registered in the IMDb database for a given year, with many years only yielding a single movie. This leads to large variances between years up until the 1970s, such as how a single movie in 1920 is completely representative of the year's extremely low average movie IMDb score of 4.8, only to surge the exisitng data point because a single movie performed better in 1925 and received a rating of 8.3. Regardless, the general trend appears to be a declining average IMDb score over time. This may not reflect the quality of large production films, but rather reduced barriers to entry have enabled a surge in indie films to enter the market and the fact that the IMDb database can also register these films with the rise of internet-based titles being published on platforms like YouTube. 
+
+
+Show number of movies released in each year
+
+Create df with number year and movies in that year
+```{r}
+movie_yearly_count <- movie_df %>% 
+  group_by(title_year) %>%
+  summarise(yearly_total = sum(length(title_year)))
+```
+
+Verify sum of number of movies in the data frame
+```{r}
+sum(movie_yearly_count$yearly_total)
+```
+
+Plotly line graph that shows number of films released by year in the data set
+```{r}
+plot_ly(movie_yearly_count, 
+        x = movie_yearly_count$title_year, y = movie_yearly_count$yearly_total, type = "scatter", mode = "lines") %>% 
+  layout(title = "Total films released by year")
+
+# Plot skips some years along the x-axis, but this was for spacing; the interacting with the chart will show count for every year
+```
+This graph shows the total films released by year included in the data set. There are way more movies released than this throughout these years, but the data set only includes a few thousand movie observations. The older years may have biased average scores, because there are so few entries included in the data set for that year.
+
+
+
+We can explore which actors have the highest average movie score overall.
+```{r}
+# Find actors with highest average movie score 
+actor_rating_df <- ddply(movie_df, c("actor_1_name"), summarise, # Pull out actor 1 and rating data
+                      actor_m <- mean(imdb_score, na.rm = TRUE),  # Find the mean of actors and discount na values
+                      number <- length(na.omit(imdb_score))) # Count number of movies, but omit na values
+colnames(actor_rating_df) <- c("actor_name", "avg_score", "num_of_movies") # Rename headers
+actor_avg <- actor_rating_df[which(actor_rating_df$num_of_movies >= 7),]# Actors in at least 7 movies to avoid skew
+actor_avg <- actor_avg[which(actor_avg$avg_score >= 7.15),] # Show only highest scoring actors for readability
+
+# Convert actor_name to a factor
+actor_avg$actor_name <- factor(actor_avg$actor_name)
+
+# Show highest to lowest average score
+actor_avg$actor_name <- reorder(actor_avg$actor_name, actor_avg$avg_score)
+
+# Visualization of highest scoring actors
+ggplot(actor_avg, aes(x = avg_score, y = actor_name)) + # Sets x to average score and y to the name
+  geom_point(aes(colour = actor_name)) + # Makes a point graph with different colors per actor
+  theme(axis.text = element_text(size = 10)) + # Sets font size
+  ggtitle("Actor Scores") + # Changes chart title
+  xlab("Average Score") + # Changes x field title
+  ylab("Actor Name")  # Changes y field table
+```
+
+We can see a visual representation of actors with the highest average IMDb ratings for the films they star in, with the top 3 being Leonardo DiCaprio, Tom Hanks, and Clint Eastwood. Predictions can be made for movie score utilizing these top scoring actors. This is implemented later on in this report. 
+
+
+We can explore which directors have the highest average movie score overall.
+```{r}
+# Find actors with highest average movie score 
+dir_rating_df <- ddply(movie_df, c("director_name"), summarise, # Pull out director name and rating data
+                      dir_m <- mean(imdb_score, na.rm = TRUE),  # Find the mean of directors and discount na values
+                      number <- length(na.omit(imdb_score))) # Count number of movies, but omit na values
+colnames(dir_rating_df) <- c("director_name", "avg_score", "num_of_movies") # Rename headers
+dir_avg <- dir_rating_df[which(dir_rating_df$num_of_movies >= 7),]# Direct  at least 7 movies to avoid skew
+dir_avg <- dir_avg[which(dir_avg$avg_score >= 7.5),] # Show only highest scoring directors for readability
+dir_avg <- dir_avg[which(dir_avg$director_name != ''),] # Exclude movies who have no director name 
+
+# Convert actor_name to a factor
+dir_avg$director_name <- factor(dir_avg$director_name)
+
+# Show highest to lowest average score
+dir_avg$director_name <- reorder(dir_avg$director_name, dir_avg$avg_score)
+
+# Visualization of highest scoring actors
+ggplot(dir_avg, aes(x = avg_score, y = director_name)) + # Sets x to average score and y to the name
+  geom_point(aes(colour = director_name)) + # Makes a point graph with different colors per director
+  theme(axis.text = element_text(size = 10, colour = 'black')) + # Sets font size
+  ggtitle("Director Scores") +  # Changes chart title
+  xlab("Average Score") + # Changes x field title
+  ylab("Director Name") # Changes y field table
+```
+
+We can see a visual representation of directors with the highest average IMDb ratings for the films they star in, with the top 3 being Christopher Nolan, Quentin Tarantino, and James Cameron. Predictions can be made for movie score utilizing these top scoring directors. This is implemented later on in this report.
+
+
+We can explore the average IMDb score for each content rating.
+```{r}
+content_df <- ddply(movie_df, c("content_rating"), summarise, # New DF w/ rating, avg score and # of movies 
+                    mean(imdb_score, na.rm = TRUE), # Creates column containing mean scores
+                    length(na.omit(imdb_score))) # Omits scores with NA values
+colnames(content_df) <- c("content_rating", "avg_score", "number_of_films") # Rename columns
+content_df <- content_df[which(content_df$content_rating != ""),] # Eliminate films from analysis without rating
+
+# Visualization of average score by content rating
+ggplot(content_df, aes(x = content_rating, y = avg_score)) + # Bar graph with x as rating and y as score
+  geom_bar(stat = "identity", width = .5, fill = 'deepskyblue3') + # Creates space between bars and changes color
+  theme(axis.text = element_text(size = 8, colour = 'black', angle = 45)) + # Sets text size to 8, text color to black, and angles text for separation purposes
+  ggtitle("Content Scores") + # Title of graph
+  xlab("Content Rating") + # Title of x axis
+  ylab("IMDB Score") # Title of y axis
+```
+
+Based on this plot, we can see the highest performing category of movies based on content rating is TV-MA (intended for a mature audience), with the lowest performing category being PG-13.This could possibly be the effect of restricted possibilities of movies that target a PG-13 audience not being as favored by mature audiences who watch both TV-MA movies and PG-13 movies. 
+
+
+We can show the spread of scores per content rating category with box plots.
+```{r}
+# Create data frame that excludes movies with no content rating 
+content_df2 <- movie_df[which(movie_df$content_rating != ''), ]
+
+#Use plotly for great boxplot capabilities, note: Might need to install "plotly"
+plot_ly(content_df2, x = content_df2$imdb_score, color = content_df2$content_rating, type = "box") %>%
+  layout(title = "Movie Type and Score Range")
+```
+
+These boxplots show the range film scores for each content rating. These outliers should not be removed because the values are legitimate. It is very possible for movie scores to achieve scores outside the boxplot range; either higher or lower.
+
+
+Explore Average IMDB rating by number of faces in poster
+```{r}
+# Create df with face numbers in poster and respective average score
+face_df <- movie_df %>%
+  group_by(face_count = facenumber_in_poster) %>%
+  summarise(avg_score = mean(imdb_score)) %>%
+  na.omit() # Omit NA values
+
+# Bar Graph of data
+ggplot(face_df, aes(x = face_count, y = avg_score)) +
+  geom_bar(stat = "identity", width = .5, fill = "deepskyblue3") +
+  xlab("Number of Faces") +
+  ylab("Average Score") +
+  ggtitle("Average Score by faces in poster") +
+  theme(axis.text = element_text(size = 8, angle = 0))
+  
+```
+
+The average score by faces in poster column graph shows whether having less faces in poster or more affects average score. It does not appear there is a strong relationship between the variables. While the poster with 43 faces has the highest average score, it is because there is only one movie with that the score so it is biased. The rest of the number of faces in posters seems to be fairly consistent throughout minus a few low-points.
+
+
+Show 5 number summary for average score based on color using boxplot method
+```{r}
+# Create Data Frame with average score and color
+color_film <- movie_df %>%
+  select(color, imdb_score) %>% na.omit()
+
+ggplot(color_film, aes(x = color, y = imdb_score, group = color, fill = color)) +
+  geom_boxplot() +
+  xlab("Color Type") +
+  ylab("Score") +
+  ggtitle("Black and White vs Color Film Scores")
+```
+On average colored films tend to score a higher IMDb. We decided to keep the outliers because they are valid data.
+
+
+Visualize how language affects movie score
+```{r}
+language_df <- movie_df %>%
+  group_by(language) %>%
+  summarise(avg_score = mean(imdb_score)) %>% na.omit()
+
+ggplot(language_df, aes(x = language, y = avg_score)) +
+  geom_bar(stat = "Identity", width = .5, fill = "deepskyblue3") +
+  theme(axis.text = element_text(size = 10, angle = 90)) + 
+  xlab("Original Language") +
+  ylab("Average Score") +
+  ggtitle("Language and Score")
+```
+
+Based on the chart the language that scored the highest IMDb score is the Telungu language. This is not very representative because of the small number of movies that are actually in that language. It would not be a fair assumption to say that a language that has a small amount of movies and a high IMDb score would always get a higher score than a language that has more movies.
+
+
+```{r}
+# Load in world map from map_data
+world_countries <- map_data("world2")
+```
+
+Visualize how the country the film was released in affects average score
+```{r}
+ScoreByCountry_df <- movie_df %>%
+  group_by(country) %>%
+  summarise(avg_score = mean(imdb_score)) %>% na.omit()
+
+score_plot <- ggplot()
+
+score_plot <- score_plot + geom_map(data = world_countries, map = world_countries,
+                    aes(x = long, y = lat, map_id = region),
+                    fill="#ffffff", color="#ffffff", size=0.15)
+
+score_plot <- score_plot + geom_map(data = ScoreByCountry_df, map = world_countries,
+                    aes(fill = avg_score, map_id = country),
+                    color="#ffffff", size=0.15)
+
+score_plot <- score_plot + labs(fill = "Average IMDb Score",
+                title = "Average IMDb Score by Country",
+                x="", y="")
+
+score_plot <- score_plot + theme(panel.border = element_blank())
+#score_plot <- score_plot + theme(panel.background = element_blank())
+score_plot <- score_plot + theme(axis.ticks = element_blank())
+score_plot <- score_plot + theme(axis.text = element_blank())
+
+score_plot
+```
+
+Based on the chart all countries have around the same score. There is some bias with the African nations who have a small amount of films compared to the other countries.
+
+
+Investigate to see if number of movie Facebook likes and content rating are indicators of score
+```{r}
+#movie_likes <- movie_df %>% select(movie_facebook_likes, imdb_score, content_rating)
+plot_ly(movie_df, x = movie_df$movie_facebook_likes, y = movie_df$imdb_score,
+        color =movie_df$content_rating , mode = "markers",text=paste('Content:',movie_df$content_rating))
+```
+
+It appears that all the movie ratings tend to score around the same score. It also appears that the R movie rating is the most commonly rated movie.
+
+
+Clear out environment for information management purposes
+```{r}
+rm(list = ls()[!ls() %in% c("movie_df")])
+```
+
+\newpage
+
+# Correlation
+
+We chose to use Pearson Correlation, because the measures are not ordinal, and measures are linear
+
+Pearson Correlation Table 1
+
+Load Corrplot
+```{r}
+library(corrplot)
+```
+
+
+Create data frame with only numeric types to see how numeric variables correlate to IMDb score 
+```{r}
+numeric_df <- select_if(movie_df, is.numeric) # Other option cor(movie_df[sapply(movie_df, is.numeric)])
+
+# Creates a correlation table showing variables correlate w/ each other by number and text color 
+num_correlation <- round(cor(numeric_df, use = "pairwise.complete.obs", method = "pearson"),1)
+corrplot(num_correlation, method = "number", type = )
+
+# Note: After running this chunk, you can also select hte num_correlation item from the global environment to view a generic table
+```
+
+Pearson Correlation Table 2, Visualized with Circles
+
+```{r}
+# Creates a correlation table showing variables correlate w/ each other by color and  circle size
+corrplot(num_correlation, method = "circle")
+```
+
+It appears that most variables have a very small correlation with each other. Some exceptions are the actor_1_facebook_likes and cast_total_facebook_likes as well as budget and gross_profit. This might be because if there are a lot of likes on the lead actor then the rest of the cast will be liked as well. Since there is a low correlation we may not be able to predict the scores very well.
+
+
+Clear out global environment except for movie_df for information management purposes
+```{r}
+rm(list = ls()[!ls() %in% c("movie_df")])
+```
+
+\newpage
+
+# Multiple Linear Regression 
+
+Create data frame to be used for prediction
+
+```{r}
+str(movie_df)
+```
+
+Eliminate NA values
+```{r}
+movie_df <- movie_df %>% na.omit()
+```
+
+Create factors of highest scoring actors and directors
+```{r}
+movie_df$dicaprio <- ifelse(movie_df$actor_1_name == "Leonardo DiCaprio", 1, 0)
+movie_df$hanks <- ifelse(movie_df$actor_1_name == "Tom Hanks", 1, 0)
+movie_df$eastwood <- ifelse(movie_df$actor_1_name == "Clint Eastwood", 1, 0)
+movie_df$hardy <- ifelse(movie_df$actor_1_name == "Tom Hardy", 1, 0)
+movie_df$rickman <- ifelse(movie_df$actor_1_name == "Alan Rickman", 1, 0)
+movie_df$cumberbatch <- ifelse(movie_df$actor_1_name == "Benedict Cumberbatch", 1, 0)
+movie_df$bale <- ifelse(movie_df$actor_1_name == "Christian Bale", 1, 0)
+movie_df$hoffman <- ifelse(movie_df$actor_1_name == "Philip Seymour Hoffman", 1, 0)
+movie_df$driver <- ifelse(movie_df$actor_1_name == "Minni Driver", 1, 0)
+movie_df$ford <- ifelse(movie_df$actor_1_name == "Harrison Ford", 1, 0)
+movie_df$spacy <- ifelse(movie_df$actor_1_name == "Kevin Spacey", 1, 0)
+movie_df$nolan <- ifelse(movie_df$director_name == "Christopher Nolan", 1, 0)
+movie_df$tarantino <- ifelse(movie_df$director_name == "Quentin Tarantino", 1, 0)
+movie_df$cameron <- ifelse(movie_df$director_name == "James Cameron", 1, 0)
+movie_df$jackson <- ifelse(movie_df$director_name == "Peter Jackson", 1, 0)
+movie_df$fincher <- ifelse(movie_df$director_name == "David Fincher", 1, 0)
+movie_df$scorsese <- ifelse(movie_df$director_name == "Martin Scorsese", 1, 0)
+movie_df$anderson <- ifelse(movie_df$director_name == "Wes Anderson", 1, 0)
+movie_df$Greengrass <- ifelse(movie_df$director_name == "Paul Greengrass", 1, 0)
+```
+
+Build multiple linear regression model to see how the significance of variables on IMDB Score 
+
+Load MASS Package to fit model
+```{r}
+library(MASS)
+```
+
+Regress IMDB score on all other variables and use step method to determine which model to use
+```{r}
+# Fit the model
+score_fit <- lm(imdb_score ~ + country + content_rating + color + title_year + language +
+                  facenumber_in_poster + gross + dicaprio + hanks + eastwood + hardy +
+                  rickman + cumberbatch + bale + hoffman + driver + ford + spacy + nolan +
+                  tarantino + cameron + jackson + fincher + scorsese + anderson + Greengrass, 
+                data = movie_df)
+
+# Perform stepwise model seleciton 
+score_step <- stepAIC(score_fit, direction = "both")
+
+# Show resultsd
+score_step$Anova
+```
+
+Since the original model had a lower AIC than the stepped models, we chose to use this model
+
+
+Build final regression model
+```{r}
+# Create multiple linear regression model
+final_linear <- lm(imdb_score ~ country + content_rating + color + title_year + 
+    language + facenumber_in_poster + gross + dicaprio + hanks + 
+    eastwood + hardy + rickman + cumberbatch + bale + hoffman + 
+    driver + ford + spacy + nolan + tarantino + cameron + jackson + 
+    fincher + scorsese + anderson + Greengrass, data = movie_df)
+
+# Show the summary of the multiple linear regression model
+summary(final_linear)
+```
+
+
+Remove MASS package from the environment as it affects the dplyr package
+```{r}
+detach("package:MASS", unload = F)
+```
+
+
+\newpage
+
+# Predictive Modeling
+
+Load caret Package
+```{r}
+library(caret)
+```
+
+Create 10-Fold validation configuration of control
+```{r}
+fit_control <- trainControl(method = "cv", number = 10)
+```
+
+Train Multiple Linear Regression model to predict imdb_score
+```{r, warning = FALSE, message = FALSE}
+# Set seed to obtain same results each time
+set.seed(1234)
+
+# Train linear model
+multi_fit <- train(imdb_score ~ country + content_rating + color + title_year + 
+    language + facenumber_in_poster + gross + dicaprio + hanks + 
+    eastwood + hardy + rickman + cumberbatch + bale + hoffman + 
+    driver + ford + spacy + nolan + tarantino + cameron + jackson + 
+    fincher + scorsese + anderson + Greengrass, 
+                   data = movie_df,
+                   trControl = fit_control,
+                   method = "lm")
+
+# Print results
+print(multi_fit)
+```
+
+Train Gradient Boosted Machine Method to predict imdb_score
+```{r, warning = FALSE, message = FALSE}
+set.seed(1234)
+gbm_fit <- train(imdb_score ~ country + content_rating + color + title_year + 
+    language + facenumber_in_poster + gross + dicaprio + hanks + 
+    eastwood + hardy + rickman + cumberbatch + bale + hoffman + 
+    driver + ford + spacy + nolan + tarantino + cameron + jackson + 
+    fincher + scorsese + anderson + Greengrass,
+                 data = movie_df,
+                 trControl = fit_control,
+                 method = "gbm",
+                 verbose = F)
+
+print(gbm_fit)
+```
+
+Train Support Machine Vector to predict imdb_score
+```{r, warning = FALSE, message = FALSE}
+svm_fit <- train(imdb_score ~ country + content_rating + color + title_year + 
+    language + facenumber_in_poster + gross + dicaprio + hanks + 
+    eastwood + hardy + rickman + cumberbatch + bale + hoffman + 
+    driver + ford + spacy + nolan + tarantino + cameron + jackson + 
+    fincher + scorsese + anderson + Greengrass,
+                 data = movie_df,
+                 trControl = fit_control,
+                 method = "svmRadial",
+                 verbose = F)
+
+print(svm_fit)
+```
+
+Train Decision Tree to predict imdb_score
+```{r, warning = FALSE, message = FALSE}
+dtree_fit <- train(imdb_score ~ country + content_rating + color + title_year + 
+    language + facenumber_in_poster + gross + dicaprio + hanks + 
+    eastwood + hardy + rickman + cumberbatch + bale + hoffman + 
+    driver + ford + spacy + nolan + tarantino + cameron + jackson + 
+    fincher + scorsese + anderson + Greengrass, 
+            data = movie_df,
+            method = "rpart",
+            trControl = fit_control,
+            tuneLength = 20,
+            parms=list(split='information'))
+
+print(dtree_fit)
+```
+
+```{r}
+# Output the final model for the decision tree
+rpart.plot::rpart.plot(dtree_fit$finalModel)
+```
+
+Use simple splitting to predict imdb_score
+```{r, warning = FALSE, message = FALSE}
+# Create predictive df with columns used for other models
+predictive_df <- movie_df %>% select(imdb_score, country, content_rating, color, title_year, 
+    language, facenumber_in_poster, gross, dicaprio, hanks, 
+    eastwood, hardy, rickman, cumberbatch, bale, hoffman, 
+    driver, ford, spacy, nolan, tarantino, cameron, jackson,
+    fincher, scorsese, anderson, Greengrass)
+# This was done to simplify subsutting of the df for train_data and test_data
+
+set.seed(1234)
+split_fit <- createDataPartition(predictive_df$imdb_score, p = .8, list = F)
+
+train_data <- predictive_df[split_fit,]
+test_data <- predictive_df[-split_fit,]
+
+m1 <- lm(imdb_score~., data = test_data)
+
+# Make predictions
+x_test <- test_data[,-1]
+y_test <- test_data[,1]
+predictions <- predict(multi_fit, test_data)
+
+# Summarize results 
+simple_split <- postResample(predictions, y_test)
+simple_split
+```
+
+\newpage
+
+# Summarize Findings
+
+Resample and show results to find the best model
+```{r}
+results <- resamples(list(linear = multi_fit, GBM = gbm_fit, SVM = svm_fit, rpart = dtree_fit))
+
+summary(results)
+```
+
+1. Linear Model with a 10-fold cross validation:
+      RMSE:   0.9511951
+      R2:     0.1993298
+2. GBM with a 10-fold cross validation:
+      RMSE:   0.9522526
+      R2:     0.1906169
+3. Decision Tree with a 10-fold cross validation:
+      RMSE:   0.9756082
+      R2:     0.15047172
+4. SVM (Radial Kernal) with a 10-fold cross validation:
+      RMSE:   1.059011
+      R2:     0.002070716
+
+The Linear Model with a 10-fold cross validation has the best performance. It was the lowest RMSE and the highest R2. 
+
+
+According to the linear model, there is a significantly negative effect of having a film in color. This may relate to how newer films are now in color. When you consider that films have slightly lowered in their average IMDb score over time, it may not be ideal to recommend that film producers shoot their films in grayscale if they want to improve performance.
+
+The decision tree can give better actionable steps to improve the IMDb rating for a film to be released in the future. In general, movies that are released in the UK, aren't produced in color, are rated R, and aren't in English tend to have higher IMDb scores. Movies with a higher gross tend to have the highest IMDb scores. There are certain actors and directors who consistently perform well and are featured in films with high ratings. It may be recommended to consider any of these factors for a film producer who wants to improve their movie's critical response.
+

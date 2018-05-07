@@ -1,0 +1,190 @@
+---
+title: "Multiple Linear Regression"
+author: "Langtao Chen"
+date: "Oct 28, 2017"
+output: 
+  pdf_document: 
+    toc: yes
+    toc_depth: 3
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+&nbsp;
+&nbsp;
+
+
+\newpage
+
+```{r}
+# Clean the environment
+rm(list = ls())
+```
+
+# 1. Multiple Linear Regression Modeling
+
+In this example, we'll use the mtcars dataset to demonstrate how to conduct multiple regression analysis. This dataset contains 11 variables:
+
+- mpg: Miles/(US) gallon
+
+- cyl: Number of cylinders
+
+- disp: Displacement (cu.in.)
+
+- hp: Gross horsepower
+
+- drat: Rear axle ratio
+
+- wt: Weight (1000 lbs)
+
+- qsec: 1/4 mile time
+
+- vs: V/S
+
+-	am: Transmission (0 = automatic, 1 = manual)
+
+- gear: Number of forward gears
+
+- carb: Number of carburetors
+
+
+First, let's regress mpg on wt, am, and hp.
+
+```{r}
+# Regress mpg on wt, am, and hp
+model1 <- lm(mpg ~ wt + factor(am) + hp, data = mtcars)
+summary(model1)
+```
+
+Notice that we use factor (or dummies) to represent categorical variable.
+
+Then, we can check if there is multicollinearity issue in the model.
+
+```{r}
+# Check multicolinearity
+# install.packages("car")
+library(car)
+vif(model1)
+```
+
+A general rule is that an explanatory variable with vif > 5 has multicollinearity issue. So, there is no multicollinearity issue in model 1.
+
+Let's add one more variable qsec into the regression model.
+
+```{r}
+model2 <- lm(mpg ~ wt + factor(am) + hp + qsec, data = mtcars)
+summary(model2)
+```
+
+```{r}
+# Check multicolinearity
+vif(model2)
+```
+
+Now the variable hp has a large VIF value, which indicates possible multicollinearity issue. Let's show the correlation matrix and manually check the multicollinearity issue.
+
+```{r}
+cor(mtcars[c("wt","am","hp","qsec")])
+```
+
+From the correlation matrix, we know that hp has a strong correlation with qsec. This makes sense since a car with more horsepower tends to have shorter time required for speed acceleration. Thus, adding qsec in model 2 raises the collinearity problem for hp.
+
+It seems the variable hp should be removed from the model to avoid the multicollinearity issue. Let's try another model without hp.
+
+```{r}
+model3 <- lm(mpg ~ wt + factor(am) + qsec, data = mtcars)
+summary(model3)
+```
+
+```{r}
+vif(model3)
+```
+
+It's clear that model 3 does not have multicollinearity issue.
+
+\newpage
+
+# 2. Model Selection
+
+As we have multiple regression models, let's use stargazer package to report regression results of all models.
+
+```{r}
+# install.packages("stargazer") #Install stargazer package, do this only once
+library(stargazer)
+stargazer(model1, model2, model3, type = "text", star.cutoffs = c(0.05, 0.01, 0.001),
+          title="Multiple Linear Regression", digits=4)
+
+```
+
+Based on the above comparison, we can select appropriate model for different purposes.
+
+For explanation purpose, we probably choose model 3. Because:
+
+- (1) Compared with model 2, model 3 has no collinearity issue (model 3 > model 2)
+
+
+- (2) Compared with model 1, model 3 has a higher coefficient of determination, i.e, adjusted $R^2$ (model 3 > model 1)
+
+
+For prediction purpose, we can keep on model 2 since it has the highest adjusted $R^2$.
+
+\newpage
+
+# 3. Stepwise Variable Selection
+
+In practice, when we have many candidate predictors (independent variables), we use the stepAIC() method in MASS package to do the variable selection. The stepAIC() method performs stepwise model selection by AIC (Akaike information criterion, a measure used to evaluate the relative quality of statistical models).
+
+```{r}
+# First load the MASS package
+library(MASS)
+```
+
+Let's use a full model in which the mpg is regressed on all other variables. Then use the stepwise variable selection approach to reduce the number of predictors in the regression model.
+
+```{r}
+# Regress mpg on all other variables
+fit <- lm(mpg ~ ., data = mtcars)
+
+# Perform stepwise model selection
+step <- stepAIC(fit, direction="both")
+
+# Show results
+step$anova
+```
+
+According to the stepwise variable selection approach, the recommended model is mpg ~ wt + qsec + am.
+
+Then, we use the model selected by the stepwise selection procedure as the final model.
+
+```{r}
+# Fit a linear regression model
+fit_final <- lm(mpg ~ wt + qsec + am, data = mtcars)
+
+# Show results
+summary(fit_final)
+
+```
+
+From the above results, we find that the final regression model improves model fit as it has a relatively larger adjusted R squared. Through the stepwise model selection process, the insignificant variables have beem eliminated.
+
+
+\newpage
+
+# 4. Interpreting Multiple Linear Regression
+
+Let's choose final model as selected by the stepwise variable selection approach and interpret its result.
+
+```{r}
+stargazer(model3, type = "text", star.cutoffs = c(0.05, 0.01, 0.001),
+          title="Multiple Linear Regression", digits=4)
+```
+
+The interpreation of coefficients is:
+
+- If weight increases by one 1000 pound, mpg would on average decrease by 3.92 miles per gallon after controlling for other factors.
+
+- Having a manual transmission (am = 1) would on average increase mpg by 2.94 miles per gallon after controlling for other factors.
+
+- Increasing qsec by 1 second (i.e., reducing the speed acceleration performance) would would on average increase mpg by 1.23 miles per gallon after controlling for other factors.

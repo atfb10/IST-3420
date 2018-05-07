@@ -1,0 +1,57 @@
+---
+title: "Homework 13"
+author: "Lorenzo Lewis"
+date: "11/29/2017"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# Clear environment
+```{r}
+rm(list=ls())
+```
+
+# Load packages
+```{r}
+library(tm)
+library(wordcloud)
+```
+
+# Load dataframe
+```{r}
+df <- read.csv("SMSSpamCollection.txt", sep="\t", quote="", header = FALSE, col.names = c("Class", "Text"))
+```
+
+# Create corpus
+```{r}
+corpus <- VCorpus(VectorSource(df))
+```
+
+# Apply text preprocessing
+```{r}
+# Remove whitespace
+corpus <- tm_map(corpus, stripWhitespace)
+# Convert case
+corpus <- tm_map(corpus, content_transformer(tolower))
+# Remove unimportant symbols
+corpus <- tm_map(corpus, removePunctuation)
+# Filter stop words
+corpus <- tm_map(corpus, removeWords, stopwords("english"))
+# Stem
+corpus <- tm_map(corpus, stemDocument)
+```
+
+# Create a word cloud
+```{r}
+wordcloud(corpus, max.words = 75, random.order = FALSE)
+```
+
+# Create a term-document matrix
+```{r}
+
+```
+
+

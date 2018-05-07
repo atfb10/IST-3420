@@ -1,0 +1,120 @@
+---
+title: "Predict Customer Churn"
+author: "Langtao Chen"
+date: "November 10, 2017"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+# Clean the environment
+rm(list = ls())
+```
+
+#1. Read in Dataset
+
+```{r}
+# Clean the environment
+rm(list = ls())
+# Read data file
+df <- read.csv("Telco-Customer-Churn.csv")
+```
+
+#2. Explore Data
+
+```{r, echo=TRUE}
+# Summary statistics
+summary(df)
+```
+From the summary statistics, we found that there are missing values. So we decided to remove missing values from the dataset.
+
+```{r, echo=TRUE}
+# Remove NAs
+df <- na.omit(df)
+
+# Show data sample
+head(df)
+
+```
+
+#3. Predictive Modeling
+
+```{r, echo=TRUE}
+# Load library
+library(caret)
+library(e1071)
+```
+
+In this section, we explore three different methods to predict customer churn 
+
+- Logistic Regression
+- Support Vector Machine (SVM)
+- Gradient Boosted Machine (GBM)
+
+
+## 3.1 Train Logistic Regression
+
+```{r, echo=TRUE}
+## Train a logistic regression model with 10-fold cross-validation
+fitControl <- trainControl(method = "cv",number = 10)
+
+set.seed(123)
+logit_fit <- train(Churn ~ ., data = df[-1],
+                   trControl = fitControl,
+                   method="glm", family=binomial(link='logit'))
+
+print(logit_fit)
+
+confusionMatrix(logit_fit)
+```
+
+Please note that in the train() function call, we need to exclude customer ID as a predictor. Since customer ID is the first column in the dataset, we use "data = df[-1]" as a parameter of the train() function call to exclude customer ID. The same approach is applied to other models.
+
+## 3.2 Train Support Vector Machine
+
+```{r, echo=TRUE}
+## Train Support Vector Machine (Radial Basis Function Kernel) with 10-fold Cross-Validation
+set.seed(123)
+svmRadial_fit <- train(Churn ~ ., data = df[-1],
+                       trControl = fitControl, method = "svmRadial",
+                       verbose=FALSE)
+
+print(svmRadial_fit)
+
+confusionMatrix(svmRadial_fit)
+```
+
+## 3.3 Train Gradient Boosted Machine (GBM)
+
+```{r, echo=TRUE}
+# Train GBM with 10-fold Cross-Validation
+set.seed(123)
+gbm_fit <- train(Churn ~ ., data = df[-1],
+                 trControl = fitControl, method = "gbm",
+                 verbose=FALSE)
+
+print(gbm_fit)
+
+confusionMatrix(gbm_fit)
+```
+
+## 3.4 Compare Different Predictive Models
+
+```{r}
+# Collect resamples
+results <- resamples(list(Logit=logit_fit, SVM=svmRadial_fit, GBM = gbm_fit))
+
+# Summarize the distributions
+summary(results)
+
+# Boxplots of results
+bwplot(results)
+
+# Dot plots of results
+dotplot(results)
+```
+
+Comparing the three models, we found that logistic regression model is the best since it has the highest levels of both accuracy and Kappa coefficients.

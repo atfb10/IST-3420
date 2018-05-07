@@ -1,0 +1,102 @@
+---
+title: "Web Log Analysis"
+author: "Langtao Chen"
+date: "July 16, 2016"
+output:
+  html_document:
+    toc: yes
+  pdf_document:
+    toc: yes
+---
+*Note*: This report demonstrates a sample data analytics project.
+
+## Requirements
+Company **XYZ** runs a website. The company is confronting the challenges of extracting information and knowledge from this website to better understand how visitors access the online service. The website is hosted on an Apache web server which records the log of website access. Apache log files are available for analysis.
+
+The objective of this data analytics project is to answer the following questions:
+
+- What is the distribution of visitors over the globe?
+- What are the top countries from which the visitors come?
+- How many visits are for the FAQ page?
+
+
+## Read Apache Log File
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+```{r, echo=FALSE}
+setwd("C:\\Users\\chenla\\Dropbox\\Teaching 2016 Fall\\IST 3420\\5.Data Analysis")
+
+```
+Read the Apache web log file.
+```{r}
+log <- read.table("sample_apache.log",sep = " ",stringsAsFactors = FALSE)
+```
+Show some records of the log file.
+```{r}
+head(log)
+
+```
+## Cleanse and Transform Data
+```{r}
+# Create new variables
+log <- dplyr::mutate(log,
+                     request.date = as.Date(substring(V4,2,12),"%d/%b/%Y"),
+                     request.method = gsub(" ","",substring(V6,1,4)),
+                     request.uri = gsub("/","",substring(V6,6,nchar(V6)-9)),
+                     request.protocol = substring(V6,nchar(V6)-8,nchar(V6))
+                       )
+# Rename variables
+names(log)[names(log) == "V1"] <- "remote.host"
+names(log)[names(log) == "V7"] <- "status"
+names(log)[names(log) == "V8"] <- "response.size"
+
+```
+Show unique values of variables.
+```{r}
+unique(log$request.method)
+unique(log$request.protocol)
+unique(log$status)
+unique(log$request.uri)
+unique(log$V2)
+unique(log$V3)
+
+```
+Remove useless variables.
+```{r}
+# Remove variables
+log$V2 <- NULL
+log$V3 <- NULL
+log$V4 <- NULL
+log$V5 <- NULL
+log$V6 <- NULL
+
+```
+
+Show some records of the cleaned log file.
+```{r}
+head(log)
+
+```
+
+
+## Analyze Data
+
+The data set contains `r nrow(log)` visist by `r length(unique(log$remote.host))` unique IP addresses during `r min(log$request.date)` and `r max(log$request.date)`. Below is a summary of all variables.
+
+```{r}
+summary(log)
+```
+
+The frequency of request date is shown below.
+```{r}
+library(ggplot2)
+ggplot(na.omit(log)) + geom_bar(aes(x=request.date)) + ggtitle("Requests over time")
+```
+
+To be continue...
+
+## Summarize Findings
+
+To be continue...

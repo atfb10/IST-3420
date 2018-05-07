@@ -1,0 +1,229 @@
+---
+title: "Predict the Price of Used Toyota Corolla - Neural Nets"
+author: "Langtao Chen"
+date: "Nov 10, 2017"
+output: 
+  pdf_document: 
+    toc: yes
+    toc_depth: 3
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+&nbsp;
+&nbsp;
+
+
+\newpage
+
+In this example, we'll use artificial neural network (ANN) to do the predict the price of used Toyota Corolla.
+
+#1. Read in Dataset
+```{r}
+# Clean the environment
+rm(list = ls())
+
+# Read data file
+df <- read.csv("ToyotaCorolla.csv")
+```
+
+#2. Explore Data
+
+```{r}
+# Show the head of the dataset
+head(df)
+```
+
+```{r}
+# Show the structure of the dataset
+str(df)
+```
+
+```{r}
+# Summary statistics
+summary(df)
+```
+
+From the summary statistics, we found that there is no missing value.
+
+#3. Predictive Modeling
+
+In this section, we use neural network model to predict the price of used Toyota Corolla.
+
+## 3.1 Data Preprocessing
+
+Please notice that the neuralnet() method does not allow for categorical variables. In this case, we simply use dummy variables for the FuelType variable.
+
+```{r}
+# Create dummies for FuelType.
+df$FuelType_CNG <- ifelse(df$FuelType == 'CNG', 1, 0)
+df$FuelType_Diesel <- ifelse(df$FuelType == 'Diesel', 1, 0)
+df$FuelType_Petrol <- ifelse(df$FuelType == 'Petrol', 1, 0)
+
+# Remove the old FuelType variable
+df$FuelType <- NULL
+```
+
+Also, it's usually recommended to normalize data before apply the neural network model. Since the neuralnet() method uses a logistic activation function by default (act.fct = "logistic"), we better set normalize the data to the range of [0, 1]. Now we use the preProcess() method in caret package to normalize variables.
+
+```{r}
+# Load library
+library(caret)
+```
+
+```{r}
+# calculate the pre-process parameters from the dataset
+preprocessParams <- preProcess(df, method = c("range"))
+
+# summarize transform parameters
+print(preprocessParams)
+
+# transform the dataset using the parameters
+df_scaled <- predict(preprocessParams, df)
+
+# summarize the transformed dataset
+summary(df_scaled)
+```
+
+
+## 3.2 Data Partitioning
+
+We use a single 80/20% split.
+
+```{r}
+set.seed(1234)
+trainIndex <- createDataPartition(df_scaled$Price, p = .8, list = FALSE)
+head(trainIndex)
+
+train_data <- df_scaled[ trainIndex,]
+test_data  <- df_scaled[-trainIndex,]
+```
+
+## 3.3 Fit ANN Model on the Training Dataset
+
+We use the neuralnet R package for neural network modeling. For a list of prediction and classification models, refer to http://topepo.github.io/caret/available-models.html
+
+```{r}
+# Load the neuralnet package
+library('neuralnet')
+```
+
+After we load the neuralnet package, we can use the neuralnet() method to train the neural network model.
+
+The 'hidden' is used to set a vector of integers specifying the number of hidden neurons (vertices) in each layer.
+
+```{r}
+f <- as.formula(Price ~ Age + KM + HP + FuelType_CNG + FuelType_Diesel + FuelType_Petrol + MetColor + Automatic + CC + Doors + Weight)
+
+# Fit a neural network model with 2 hidden layers
+nn_fit_2 <- neuralnet(f, data = train_data, hidden = c(5,3), linear.output=TRUE)
+
+# Show results
+summary(nn_fit_2)
+
+```
+
+Now, let's show the structure of the neural network trained.
+
+```{r}
+plot(nn_fit_2,rep="best", cex=0.8)
+```
+
+```{r}
+# Fit a neural network model with 1 hidden layer
+nn_fit_1 <- neuralnet(f, data = train_data, hidden = 6)
+
+# Show results
+summary(nn_fit_1)
+
+```
+
+Now, let's show the structure of the neural network trained.
+
+```{r}
+plot(nn_fit_1, rep="best",cex=0.8)
+```
+
+
+## 3.4 Evaluate Predictive Performance of the Two-Hidden-Layer Model
+
+Note: We cannot use the general predict() method to do the prediction for test. Instead, we use compute() method in the neuralnet package.
+
+```{r}
+# Computes the outputs of all neurons for specific arbitrary covariate vectors given a trained neural network
+pred2_norm <- compute(nn_fit_2, test_data[-1])
+pred2_norm <- pred2_norm$net.result
+```
+
+```{r}
+# Plot the normalized price and predicted normalized price
+plot(test_data$Price,pred2_norm)
+```
+
+```{r}
+# Transform the normalized price prediction to original scale
+pred2 <- pred2_norm*(max(df$Price)-min(df$Price)) + min(df$Price)
+test_price <- test_data$Price*(max(df$Price)-min(df$Price)) + min(df$Price)
+
+```
+
+```{r}
+# Plot the price and predicted price
+plot(test_price,pred2)
+```
+
+From the above plot, we can see that the predicted price is close to the actual price in the test dataset.
+
+Now, let's calculate prediction accuracy metrics including MAE (mean absolute error) and RMSE (root mean-squared error).
+
+```{r}
+# MAE (mean absolute error)
+cat("MAE =", mean(abs(test_price-pred2)))
+```
+```{r}
+# RMSE (root mean-squared error)
+cat("RMSE =", sqrt(mean((test_price-pred2)^2)))
+```
+
+## 3.5 Evaluate Predictive Performance of the One-Hidden-Layer Model
+
+Note: We cannot use the general predict() method to do the prediction for test. Instead, we use compute() method in the neuralnet package.
+
+```{r}
+# Computes the outputs of all neurons for specific arbitrary covariate vectors given a trained neural network
+pred1_norm <- compute(nn_fit_1, test_data[-1])
+pred1_norm <- pred1_norm$net.result
+```
+
+```{r}
+# Plot the normalized price and predicted normalized price
+plot(test_data$Price,pred1_norm)
+```
+
+```{r}
+# Transform the normalized price prediction to original scale
+pred1 <- pred1_norm*(max(df$Price)-min(df$Price)) + min(df$Price)
+test_price <- test_data$Price*(max(df$Price)-min(df$Price)) + min(df$Price)
+
+```
+
+```{r}
+# Plot the price and predicted price
+plot(test_price,pred1)
+```
+
+From the above plot, we can see that the predicted price is close to the actual price in the test dataset.
+
+Now, let's calculate prediction accuracy metrics including MAE (mean absolute error) and RMSE (root mean-squared error).
+
+```{r}
+# MAE (mean absolute error)
+cat("MAE =", mean(abs(test_price-pred1)))
+```
+```{r}
+# RMSE (root mean-squared error)
+cat("RMSE =", sqrt(mean((test_price-pred1)^2)))
+```
+
